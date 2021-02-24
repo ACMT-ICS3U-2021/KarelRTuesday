@@ -1,0 +1,928 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/stair_sweeper.rb",
+			"settings":
+			{
+				"buffer_size": 797,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel_window.rb",
+			"settings":
+			{
+				"buffer_size": 17209,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "tk_robot_world.rb",
+			"settings":
+			{
+				"buffer_size": 13585,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "main.rb",
+			"settings":
+			{
+				"buffer_size": 664,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "ur_robot.rb",
+			"settings":
+			{
+				"buffer_size": 4726,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "#!/opt/local/bin/ruby\n\n#Copyright 2012 Joseph Bergin\n#License: Creative Commons Attribution-Noncommercial-Share Alike 3.0 United States License\n\n$graphical = true\n$world_maker_size = 12 if $world_maker_size == nil\n# => require_relative 'tk'\nrequire 'tkextlib/tcllib.rb'\nrequire_relative 'robota'\n\n=begin\n  Each tool will drop the corresponding item at the mouse click location.\n  Control click will remove an item if present (one beeper or a wall)\n  Shift click will remove all beepers on the corner\n  If there are no beepers on the corner then control click with the beeper tool places infinitely many there. \n=end\n# A GUI to create and save world files \nclass WorldMaker < TkFrame\n\n def initialize()\n  super()\n  @dirty = false\n  $dialog = TkToplevel.new(self){\n    title  ' World Creator '\n  }\n  $dialog.raise_window $window\n  $world = Robota::World\n  geometry_string = '200x' + '300' + \"+900+25\"\n  $dialog.geometry(newGeometry = geometry_string)\n\n  TkGrid.rowconfigure($dialog, 2, :weight => 1)\n  TkGrid.columnconfigure($dialog, 0, :weight => 1)\n\n  get_file = TkButton.new($dialog, :text => \"Get File\", :command => lambda{open_file})\n  get_file.grid(:row => 0, :column => 0)\n  @show_file = TkEntry.new($dialog, :state => :disabled)\n  @show_file.grid(:row => 1, :column => 0, :sticky => \"ew\")\n  put_file = TkButton.new($dialog, :text => \"Save File\", :command => lambda{save_file})\n  put_file.grid(:row => 2, :column => 0, :sticky => 'n')\n  @text = TkLabel.new($dialog, :text => \"Tool\")\n  @text.grid(:row => 3, :column => 0)\n  @beeper = TkButton.new($dialog, :text => \"Beeper\", :command => lambda{place_beeper}, :activeforeground => 'red')\n  @beeper.grid(:row => 4, :column => 0)\n  horizontal_wall = TkButton.new($dialog, :text => \"EW Wall\", :command => lambda{east_west_wall})\n  horizontal_wall.grid(:row => 5, :column => 0)\n  vertical_wall = TkButton.new($dialog, :text => \"NS Wall\", :command => lambda{north_south_wall})\n  vertical_wall.grid(:row => 6, :column => 0)\n  $instance = self\n rescue\n  puts e.to_s\n  puts e.backtrace\n end\n\n  def dirty()\n     @dirty = true\n  end\n  \n  def check_dirty()\n      if @dirty\n         save_file()\n         @dirty = false\n         exit()\n      end   \n  end\n  \n  private\n  def place_beeper\n    # @beeper.flash\n    @current_scaler = BeeperScaler.instance\n    $window.cursor(\"dot\")\n    $window.canvas.bind(\"1\", proc{|e| @current_scaler.drop_item(e.x, e.y)})\n    $window.canvas.bind(\"Control-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, false)})\n    $window.canvas.bind(\"Shift-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, true)})\n    @text.configure(:text => \"Beeper Tool\")\n    # puts 'beeper'\n  end\n  \n  def east_west_wall\n    # puts 'e w wall'\n    @current_scaler = HorizontalWallScaler.instance\n    $window.cursor(\"top_side\")\n    $window.canvas.bind(\"1\", proc{|e| @current_scaler.drop_item(e.x, e.y)})\n    $window.canvas.bind(\"Control-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, true)})\n    $window.canvas.bind(\"Shift-Button-1\", proc{|e|}) #nothing\n    @text.configure(:text => \"EW Wall Tool\")\n  end\n  \n  def north_south_wall\n    # puts 'n s wall'\n    @current_scaler = VerticalWallScaler.instance\n    $window.cursor(\"right_side\")\n    $window.canvas.bind(\"1\", proc{|e| @current_scaler.drop_item(e.x, e.y)})\n    $window.canvas.bind(\"Control-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, true)})\n    $window.canvas.bind(\"Shift-Button-1\", proc{|e|})\n    @text.configure(:text => \"NS Wall Tool\")\n  end\n  \n def open_file\n    file =  Tk.getOpenFile\n    if file\n      $world.read_world(file)\n      @show_file.configure(:state => :normal)\n      @show_file.insert(0, file)\n      @show_file.configure(:state => :disabled)\n    end\n  rescue Exception => e\n  # puts e.to_s\n  # puts e.backtrace\n    puts \"No file selected\"\n    end\n  \n  def save_file\n    file = Tk.getSaveFile\n    if file\n      $world.save_world(file)\n    # puts file\n      # @show_file.configure(:state => :normal)\n      # @show_file.delete(0, file.size + 1)\n      # @show_file.configure(:state => :disabled)\n      puts \"file saved: \" + file.to_s\n      @dirty = false\n    end\n  rescue Exception => e\n           # puts e.to_s\n           # puts e.backtrace  \n    puts \"No file selected\"\n  end\n  \n  private\n\n  class BeeperScaler\n    \n    @@instance = BeeperScaler.new\n    \n    def BeeperScaler.instance\n      return @@instance\n    end\n    \n    \n    def scale(x, y)\n      factor = $window.scale_factor\n      factor = 1 if factor == 0\n      return ((x - $inset + factor/2)/factor ).to_i, (($window_bottom - $inset - y + factor/2)/factor).to_i\n    end\n    \n    def drop_item(x, y)\n      canvas = $window.canvas    \n      avenue, street = scale(x, y)  \n      # puts street.to_s + ' ' + avenue.to_s\n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n      $world.place_beepers(street, avenue, 1)\n      $instance.dirty()\n    end\n    \n    def remove(x, y, all)\n      canvas = $window.canvas    \n      avenue, street = scale(x, y)  \n      # puts street.to_s + ' ' + avenue.to_s\n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n      if all\n        $world.remove_all_beepers(street, avenue)\n        canvas.update\n      else\n        if $world.beepers_at?(street, avenue)\n          $world.remove_beeper(street, avenue) \n        else\n          $world.place_beepers(street, avenue, -1)\n        end      \n      end\n      $instance.dirty()\n    end\n    \n  end\n    \n  class HorizontalWallScaler\n    \n    @@instance = HorizontalWallScaler.new\n    \n    def HorizontalWallScaler.instance\n      return @@instance\n    end\n    \n    def scale(x, y)\n      factor = $window.scale_factor\n      factor = 1 if factor == 0\n      return ((x - $inset + factor/2)/factor).to_i, (($window_bottom - $inset - y ) / factor).to_i\n    end\n    \n    def drop_item(x, y)\n      canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.place_wall_north_of(street, avenue)\n      $instance.dirty()\n    end\n\n    def remove(x, y, all)\n       canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.remove_wall_north_of(street, avenue)     \n      $instance.dirty()\n    end\n  end\n\n  class VerticalWallScaler\n    \n    @@instance = VerticalWallScaler.new\n    \n    def VerticalWallScaler.instance\n      return @@instance\n    end\n    \n    def scale(x, y)\n      factor = $window.scale_factor\n      factor = 1 if factor == 0\n      return   ((x - $inset)/factor).to_i, (($window_bottom - $inset - y + factor/2) / factor).to_i\n    end\n    \n    def drop_item(x, y)\n      canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n       if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.place_wall_east_of(street, avenue)\n      $instance.dirty()\n    end\n\n    def remove(x, y, all)\n      canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n       if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.remove_wall_east_of(street, avenue)\n      $instance.dirty()\n    end\n  end\n   \nend\n\n\n# create the dialog and show it, along with a world\ndef task\n   $maker = WorldMaker.new()\n   class << $window # give the window a new closer\n      def end_program(menu)\n         $instance.check_dirty()\n      end\n   end\n  \nrescue Exception  => e\n           puts e.to_s\n           puts e.backtrace  \nend\n\n if __FILE__ == $0\n   $window = window($world_maker_size, 100)\n   $window.run do\n      task\n   end\nend",
+			"file": "world_maker.rb",
+			"file_size": 7971,
+			"file_write_time": 132574001877519480,
+			"settings":
+			{
+				"buffer_size": 7971,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "/home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/Ruby Debugger.sublime-settings",
+			"settings":
+			{
+				"buffer_size": 753,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Immediate",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Breakpoints",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Stack",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "Connecting... \n/home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/sublime_debug_require.rb:14:in `block in <top (required)>': undefined method `wait_connection=' for Byebug:Module (NoMethodError)\n\tfrom /home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/sublime_debug_require.rb:26:in `<top (required)>'\n\tfrom /home/osboxes/.rvm/rubies/ruby-2.4.2/lib/ruby/site_ruby/2.4.0/rubygems/core_ext/kernel_require.rb:54:in `require'\n\tfrom /home/osboxes/.rvm/rubies/ruby-2.4.2/lib/ruby/site_ruby/2.4.0/rubygems/core_ext/kernel_require.rb:54:in `require'\nDebugger stopped\n\t\t\t",
+			"settings":
+			{
+				"buffer_size": 581,
+				"line_ending": "Unix",
+				"name": "Output",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Locals",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Threads",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Watch",
+				"read_only": true,
+				"scratch": true
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"in",
+				"Package Control: Install Package"
+			],
+			[
+				"ins",
+				"Package Control: Install Package"
+			],
+			[
+				"inst",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/tasks"
+	],
+	"file_history":
+	[
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/main.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/remote_control.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/karel_window.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/environmentsetup.txt",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/adder.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/beeper_finder.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/beeper_layer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/beeper_putter.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/block_walker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/choreographer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/contractor.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/field_harvester.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/guard.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/harvester.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/main.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/mathematician.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/mile_mover.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/mile_walker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/neighbor_talker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/observable_picker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/organizer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/pg13.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/pg14.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/pg23.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/philosopher.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/racer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/relay_racer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/rent_a_jobber.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/replanter.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/section3.9.3.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/sloppy_but_valid.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/sparse_harvester.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/spy.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/strategy_layer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/thread_racer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/walk_listener.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Checker.html",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/direction.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/tk_robot_world.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/ur_robot.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/world_maker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot_world_base.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robota.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/sensor_pack.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/stair_sweeper.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/test_robots.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot_world.rb"
+	],
+	"find":
+	{
+		"height": 24.0
+	},
+	"find_in_files":
+	{
+		"height": 98.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"require "
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"require_relative "
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 3,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/stair_sweeper.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 797,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								1,
+								1
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 13,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "karel_window.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 17209,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								168,
+								168
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 12,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "tk_robot_world.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 13585,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								706,
+								706
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "main.rb",
+					"semi_transient": true,
+					"settings":
+					{
+						"buffer_size": 664,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "ur_robot.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 4726,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								200,
+								200
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
+					"file": "world_maker.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 7971,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+									[
+										729,
+										729
+									]
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								701,
+								701
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 6,
+					"file": "/home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/Ruby Debugger.sublime-settings",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 753,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								553,
+								553
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/JavaScript/JSON.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				}
+			]
+		},
+		{
+			"selected": 3,
+			"sheets":
+			[
+				{
+					"buffer": 7,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 11,
+					"type": "text"
+				},
+				{
+					"buffer": 8,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 9,
+					"type": "text"
+				},
+				{
+					"buffer": 9,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 7,
+					"type": "text"
+				},
+				{
+					"buffer": 10,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 581,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								581,
+								581
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 5,
+					"type": "text"
+				}
+			]
+		},
+		{
+			"selected": 2,
+			"sheets":
+			[
+				{
+					"buffer": 11,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 10,
+					"type": "text"
+				},
+				{
+					"buffer": 12,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 8,
+					"type": "text"
+				},
+				{
+					"buffer": 13,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 6,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 24.0
+	},
+	"input":
+	{
+		"height": 36.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				2,
+				1
+			],
+			[
+				0,
+				1,
+				1,
+				2
+			],
+			[
+				1,
+				1,
+				2,
+				2
+			]
+		],
+		"cols":
+		[
+			0.0,
+			0.675528167113,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			0.7,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "untitled.sublime-project",
+	"replace":
+	{
+		"height": 44.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 233.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

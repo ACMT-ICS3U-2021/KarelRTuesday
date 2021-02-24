@@ -1,0 +1,3084 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "default/stair_sweeper.rb",
+			"settings":
+			{
+				"buffer_size": 797,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel/karel_window.rb",
+			"settings":
+			{
+				"buffer_size": 17201,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel/robot.rb",
+			"settings":
+			{
+				"buffer_size": 315,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel/tk_robot_world.rb",
+			"settings":
+			{
+				"buffer_size": 13585,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel/ur_robot.rb",
+			"settings":
+			{
+				"buffer_size": 4726,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "mixins/sensor_pack.rb",
+			"settings":
+			{
+				"buffer_size": 1644,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel/robota.rb",
+			"settings":
+			{
+				"buffer_size": 3626,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "karel/test_robots.rb",
+			"settings":
+			{
+				"buffer_size": 4098,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "#!/opt/local/bin/ruby\n\n#Copyright 2012 Joseph Bergin\n#License: Creative Commons Attribution-Noncommercial-Share Alike 3.0 United States License\n\n$graphical = true\n$world_maker_size = 12 if $world_maker_size == nil\n# => require_relative 'tk'\nrequire 'tkextlib/tcllib.rb'\nrequire_relative 'robota'\n\n=begin\n  Each tool will drop the corresponding item at the mouse click location.\n  Control click will remove an item if present (one beeper or a wall)\n  Shift click will remove all beepers on the corner\n  If there are no beepers on the corner then control click with the beeper tool places infinitely many there. \n=end\n# A GUI to create and save world files \nclass WorldMaker < TkFrame\n\n def initialize()\n  super()\n  @dirty = false\n  $dialog = TkToplevel.new(self){\n    title  ' World Creator '\n  }\n  $dialog.raise_window $window\n  $world = Robota::World\n  geometry_string = '200x' + '300' + \"+900+25\"\n  $dialog.geometry(newGeometry = geometry_string)\n\n  TkGrid.rowconfigure($dialog, 2, :weight => 1)\n  TkGrid.columnconfigure($dialog, 0, :weight => 1)\n\n  get_file = TkButton.new($dialog, :text => \"Get File\", :command => lambda{open_file})\n  get_file.grid(:row => 0, :column => 0)\n  @show_file = TkEntry.new($dialog, :state => :disabled)\n  @show_file.grid(:row => 1, :column => 0, :sticky => \"ew\")\n  put_file = TkButton.new($dialog, :text => \"Save File\", :command => lambda{save_file})\n  put_file.grid(:row => 2, :column => 0, :sticky => 'n')\n  @text = TkLabel.new($dialog, :text => \"Tool\")\n  @text.grid(:row => 3, :column => 0)\n  @beeper = TkButton.new($dialog, :text => \"Beeper\", :command => lambda{place_beeper}, :activeforeground => 'red')\n  @beeper.grid(:row => 4, :column => 0)\n  horizontal_wall = TkButton.new($dialog, :text => \"EW Wall\", :command => lambda{east_west_wall})\n  horizontal_wall.grid(:row => 5, :column => 0)\n  vertical_wall = TkButton.new($dialog, :text => \"NS Wall\", :command => lambda{north_south_wall})\n  vertical_wall.grid(:row => 6, :column => 0)\n  $instance = self\n rescue\n  puts e.to_s\n  puts e.backtrace\n end\n\n  def dirty()\n     @dirty = true\n  end\n  \n  def check_dirty()\n      if @dirty\n         save_file()\n         @dirty = false\n         exit()\n      end   \n  end\n  \n  private\n  def place_beeper\n    # @beeper.flash\n    @current_scaler = BeeperScaler.instance\n    $window.cursor(\"dot\")\n    $window.canvas.bind(\"1\", proc{|e| @current_scaler.drop_item(e.x, e.y)})\n    $window.canvas.bind(\"Control-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, false)})\n    $window.canvas.bind(\"Shift-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, true)})\n    @text.configure(:text => \"Beeper Tool\")\n    # puts 'beeper'\n  end\n  \n  def east_west_wall\n    # puts 'e w wall'\n    @current_scaler = HorizontalWallScaler.instance\n    $window.cursor(\"top_side\")\n    $window.canvas.bind(\"1\", proc{|e| @current_scaler.drop_item(e.x, e.y)})\n    $window.canvas.bind(\"Control-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, true)})\n    $window.canvas.bind(\"Shift-Button-1\", proc{|e|}) #nothing\n    @text.configure(:text => \"EW Wall Tool\")\n  end\n  \n  def north_south_wall\n    # puts 'n s wall'\n    @current_scaler = VerticalWallScaler.instance\n    $window.cursor(\"right_side\")\n    $window.canvas.bind(\"1\", proc{|e| @current_scaler.drop_item(e.x, e.y)})\n    $window.canvas.bind(\"Control-Button-1\", proc{|e| @current_scaler.remove(e.x, e.y, true)})\n    $window.canvas.bind(\"Shift-Button-1\", proc{|e|})\n    @text.configure(:text => \"NS Wall Tool\")\n  end\n  \n def open_file\n    file =  Tk.getOpenFile\n    if file\n      $world.read_world(file)\n      @show_file.configure(:state => :normal)\n      @show_file.insert(0, file)\n      @show_file.configure(:state => :disabled)\n    end\n  rescue Exception => e\n  # puts e.to_s\n  # puts e.backtrace\n    puts \"No file selected\"\n    end\n  \n  def save_file\n    file = Tk.getSaveFile\n    if file\n      $world.save_world(file)\n    # puts file\n      # @show_file.configure(:state => :normal)\n      # @show_file.delete(0, file.size + 1)\n      # @show_file.configure(:state => :disabled)\n      puts \"file saved: \" + file.to_s\n      @dirty = false\n    end\n  rescue Exception => e\n           # puts e.to_s\n           # puts e.backtrace  \n    puts \"No file selected\"\n  end\n  \n  private\n\n  class BeeperScaler\n    \n    @@instance = BeeperScaler.new\n    \n    def BeeperScaler.instance\n      return @@instance\n    end\n    \n    \n    def scale(x, y)\n      factor = $window.scale_factor\n      factor = 1 if factor == 0\n      return ((x - $inset + factor/2)/factor ).to_i, (($window_bottom - $inset - y + factor/2)/factor).to_i\n    end\n    \n    def drop_item(x, y)\n      canvas = $window.canvas    \n      avenue, street = scale(x, y)  \n      # puts street.to_s + ' ' + avenue.to_s\n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n      $world.place_beepers(street, avenue, 1)\n      $instance.dirty()\n    end\n    \n    def remove(x, y, all)\n      canvas = $window.canvas    \n      avenue, street = scale(x, y)  \n      # puts street.to_s + ' ' + avenue.to_s\n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n      if all\n        $world.remove_all_beepers(street, avenue)\n        canvas.update\n      else\n        if $world.beepers_at?(street, avenue)\n          $world.remove_beeper(street, avenue) \n        else\n          $world.place_beepers(street, avenue, -1)\n        end      \n      end\n      $instance.dirty()\n    end\n    \n  end\n    \n  class HorizontalWallScaler\n    \n    @@instance = HorizontalWallScaler.new\n    \n    def HorizontalWallScaler.instance\n      return @@instance\n    end\n    \n    def scale(x, y)\n      factor = $window.scale_factor\n      factor = 1 if factor == 0\n      return ((x - $inset + factor/2)/factor).to_i, (($window_bottom - $inset - y ) / factor).to_i\n    end\n    \n    def drop_item(x, y)\n      canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.place_wall_north_of(street, avenue)\n      $instance.dirty()\n    end\n\n    def remove(x, y, all)\n       canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n      if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.remove_wall_north_of(street, avenue)     \n      $instance.dirty()\n    end\n  end\n\n  class VerticalWallScaler\n    \n    @@instance = VerticalWallScaler.new\n    \n    def VerticalWallScaler.instance\n      return @@instance\n    end\n    \n    def scale(x, y)\n      factor = $window.scale_factor\n      factor = 1 if factor == 0\n      return   ((x - $inset)/factor).to_i, (($window_bottom - $inset - y + factor/2) / factor).to_i\n    end\n    \n    def drop_item(x, y)\n      canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n       if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.place_wall_east_of(street, avenue)\n      $instance.dirty()\n    end\n\n    def remove(x, y, all)\n      canvas = $window.canvas      \n      avenue, street = scale(x, y)  \n       if(street < 1 or avenue < 1 or street > $window.number_of_streets() or avenue > $window.number_of_streets()) \n        return\n      end\n     $world.remove_wall_east_of(street, avenue)\n      $instance.dirty()\n    end\n  end\n   \nend\n\n\n# create the dialog and show it, along with a world\ndef task\n   $maker = WorldMaker.new()\n   class << $window # give the window a new closer\n      def end_program(menu)\n         $instance.check_dirty()\n      end\n   end\n  \nrescue Exception  => e\n           puts e.to_s\n           puts e.backtrace  \nend\n\n if __FILE__ == $0\n   $window = window($world_maker_size, 100)\n   $window.run do\n      task\n   end\nend",
+			"file": "karel/world_maker.rb",
+			"file_size": 7971,
+			"file_write_time": 132574001877519480,
+			"settings":
+			{
+				"buffer_size": 7971,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "tasks/main.rb",
+			"settings":
+			{
+				"buffer_size": 635,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "#!/opt/local/bin/ruby\n\n#Copyright 2012 Joseph Bergin\n#License: Creative Commons Attribution-Noncommercial-Share Alike 3.0 United States License\n\n$graphical = true\n\nrequire_relative 'ur_robot'\nrequire 'tk'\n\n# a class whose objects are dialogs that control a simple robot. \nclass RemoteControl < TkFrame\n  @@count = 0\n\n  def initialize (name, street, avenue, direction, beepers, color=TRANSPARENT)\n    super()\n    @robot = UrRobot.new(street, avenue, direction, beepers, color)\n    @name = name\n    color = :white if color == nil\n    @dialog = TkToplevel.new(self){\n      title  name\n      bg color\n    }\n    @@offset = 15\n    $canvas = $window.canvas\n    @dialog.raise_window $window\n    $world = Robota::World\n    where = \"+\" + (900 + @@count*@@offset).to_s + \"+\" + (25 + @@count*@@offset).to_s\n    geometry_string = '150x' + '170' + where #\"+900+25\"\n    @@count += 1\n    @dialog.geometry(newGeometry = geometry_string)\n\n    TkGrid.rowconfigure(@dialog, 2, :weight => 1)\n    TkGrid.columnconfigure(@dialog, 0, :weight => 1)\n\n    move = TkButton.new(@dialog, text: \"Move\", command: lambda{move_robot})\n    move.grid(:row => 0, :column => 0)\n    turn = TkButton.new(@dialog, text: \"TurnLeft\", command: lambda{turn_robot})\n    turn.grid(:row => 1, :column => 0, :sticky => 'n')\n    pick = TkButton.new(@dialog, text: \"PickBeeper\", command: lambda{pick_beeper})\n    pick.grid(:row => 2, :column => 0, :sticky => 'n')\n    put = TkButton.new(@dialog, text: \"PutBeeper\", command: lambda{put_beeper})\n    put.grid(:row => 3, :column => 0, :sticky => 'n')\n    off = TkButton.new(@dialog, text: \"TurnOff\", command: lambda{off_robot})\n    off.grid(:row => 4, :column => 0, :sticky => 'n')\n    put_file = TkButton.new(@dialog, text: \"Save File\", command: lambda{save_file})\n    put_file.grid(:row => 5, :column => 0, :sticky => 'n')\n  end\n\n  private\n\n    def move_robot\n      @robot.move\n      puts @name + ' moved.'\n      $canvas.update\n    rescue Exception  => e\n             puts e.to_s\n             puts e.backtrace  \n    end\n    \n      def save_file\n      file = Tk.getSaveFile\n      if file\n        $world.save_world(file)\n      # puts file\n        # @show_file.configure(:state => :normal)\n        # @show_file.delete(0, file.size + 1)\n        # @show_file.configure(:state => :disabled)\n        puts \"file saved: \" + file.to_s\n      end\n    rescue Exception => e\n             # puts e.to_s\n             # puts e.backtrace  \n      puts \"No file selected\"\n    end\n\n\n    def turn_robot\n      @robot.turn_left\n      puts @name + ' turned left.'\n      $canvas.update\n    rescue Exception  => e\n             puts e.to_s\n             puts e.backtrace  \n    end\n\n    def pick_beeper\n      @robot.pick_beeper\n      puts @name + ' picked one beeper.'\n      $canvas.update\n    rescue Exception  => e\n             puts e.to_s\n             puts e.backtrace  \n    end\n\n    def put_beeper\n      @robot.put_beeper\n      puts @name + ' put one beeper.'\n      $canvas.update\n    rescue Exception  => e\n             puts e.to_s\n             puts e.backtrace  \n    end\n\n    def off_robot\n      @robot.turn_off\n      puts @name + ' turned off.'\n      $canvas.update\n    rescue Exception  => e\n             puts e.to_s\n             puts e.backtrace  \n    end\n\n  end\n\n#used for testing only\ndef task \n  # $world.place_beepers(2, 1, 2)\n  $world.read_world('../worlds/stair_world.txt') \n  # karel = RemoteControl.new('Ruby', 2, 5, Robota::NORTH, 3)\n  karel = RemoteControl.new('Charley', 1, 1, Robota::NORTH, 3, :yellow)\n  \n   $window.canvas.update\nrescue Exception  => e\n           puts e.to_s\n           puts e.backtrace  \nend\n\nif __FILE__ == $0\n  $window = window(10)\n  $window.run{task}\nend",
+			"file": "karel/remote_control.rb",
+			"file_size": 3665,
+			"file_write_time": 132584769503923993,
+			"settings":
+			{
+				"buffer_size": 3665,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "Searching 1271 files for \"assert\"\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/fr_class_index.html:\n   23      <a href=\"classes/Accomplice.html\">Accomplice</a><br />\n   24      <a href=\"classes/Adder.html\">Adder</a><br />\n   25:     <a href=\"classes/Assertions.html\">Assertions</a><br />\n   26      <a href=\"classes/BeeperFinder.html\">BeeperFinder</a><br />\n   27      <a href=\"classes/BeeperLayer.html\">BeeperLayer</a><br />\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/fr_file_index.html:\n   56      <a href=\"files/default/thread_racer_rb.html\">default/thread_racer.rb</a><br />\n   57      <a href=\"files/default/walk_listener_rb.html\">default/walk_listener.rb</a><br />\n   58:     <a href=\"files/karel/assertions_rb.html\">karel/assertions.rb</a><br />\n   59      <a href=\"files/karel/die_rb.html\">karel/die.rb</a><br />\n   60      <a href=\"files/karel/direction_rb.html\">karel/direction.rb</a><br />\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/fr_method_index.html:\n   29      <a href=\"files/default/rent_a_jobber_rb.html#M000025\">advert (default/rent_a_jobber.rb)</a><br />\n   30      <a href=\"classes/SensorPack.html#M000366\">any_beepers_in_beeper_bag? (SensorPack)</a><br />\n   31:     <a href=\"classes/Assertions.html#M000350\">assert_at (Assertions)</a><br />\n   32:     <a href=\"classes/Assertions.html#M000348\">assert_avenue (Assertions)</a><br />\n   33:     <a href=\"classes/Assertions.html#M000354\">assert_beepers (Assertions)</a><br />\n   34:     <a href=\"classes/RobotWorldBase.html#M000295\">assert_beepers_at (RobotWorldBase)</a><br />\n   35:     <a href=\"classes/Assertions.html#M000352\">assert_facing (Assertions)</a><br />\n   36:     <a href=\"classes/Assertions.html#M000360\">assert_front_blocked (Assertions)</a><br />\n   37:     <a href=\"classes/Assertions.html#M000359\">assert_front_clear (Assertions)</a><br />\n   38:     <a href=\"classes/Assertions.html#M000361\">assert_neighbors (Assertions)</a><br />\n   39:     <a href=\"classes/Assertions.html#M000362\">assert_no_neighbors (Assertions)</a><br />\n   40:     <a href=\"classes/Assertions.html#M000351\">assert_not_at (Assertions)</a><br />\n   41:     <a href=\"classes/Assertions.html#M000349\">assert_not_avenue (Assertions)</a><br />\n   42:     <a href=\"classes/Assertions.html#M000355\">assert_not_beepers (Assertions)</a><br />\n   43:     <a href=\"classes/Assertions.html#M000353\">assert_not_facing (Assertions)</a><br />\n   44:     <a href=\"classes/Assertions.html#M000358\">assert_not_running (Assertions)</a><br />\n   45:     <a href=\"classes/Assertions.html#M000347\">assert_not_street (Assertions)</a><br />\n   46:     <a href=\"classes/RobotWorldBase.html#M000294\">assert_robots_at (RobotWorldBase)</a><br />\n   47:     <a href=\"classes/Assertions.html#M000357\">assert_running (Assertions)</a><br />\n   48:     <a href=\"classes/Assertions.html#M000356\">assert_some_beepers (Assertions)</a><br />\n   49:     <a href=\"classes/Assertions.html#M000346\">assert_street (Assertions)</a><br />\n   50      <a href=\"classes/Turner.html#M000365\">back_up (Turner)</a><br />\n   51      <a href=\"classes/RobotWorld.html#M000139\">beepers_at? (RobotWorld)</a><br />\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.html:\n    6  <html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\n    7  <head>\n    8:   <title>Module: Assertions</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <meta http-equiv=\"Content-Script-Type\" content=\"text/javascript\" />\n   ..\n   51          <tr class=\"top-aligned-row\">\n   52            <td><strong>Module</strong></td>\n   53:           <td class=\"class-name-in-header\">Assertions</td>\n   54          </tr>\n   55          <tr class=\"top-aligned-row\">\n   56              <td><strong>In:</strong></td>\n   57              <td>\n   58:                 <a href=\"../files/karel/assertions_rb.html\">\n   59:                 karel/assertions.rb\n   60                  </a>\n   61          <br />\n   ..\n   81  \n   82        <div class=\"name-list\">\n   83:       <a href=\"#M000350\">assert_at</a>&nbsp;&nbsp;\n   84:       <a href=\"#M000348\">assert_avenue</a>&nbsp;&nbsp;\n   85:       <a href=\"#M000354\">assert_beepers</a>&nbsp;&nbsp;\n   86:       <a href=\"#M000352\">assert_facing</a>&nbsp;&nbsp;\n   87:       <a href=\"#M000360\">assert_front_blocked</a>&nbsp;&nbsp;\n   88:       <a href=\"#M000359\">assert_front_clear</a>&nbsp;&nbsp;\n   89:       <a href=\"#M000361\">assert_neighbors</a>&nbsp;&nbsp;\n   90:       <a href=\"#M000362\">assert_no_neighbors</a>&nbsp;&nbsp;\n   91:       <a href=\"#M000351\">assert_not_at</a>&nbsp;&nbsp;\n   92:       <a href=\"#M000349\">assert_not_avenue</a>&nbsp;&nbsp;\n   93:       <a href=\"#M000355\">assert_not_beepers</a>&nbsp;&nbsp;\n   94:       <a href=\"#M000353\">assert_not_facing</a>&nbsp;&nbsp;\n   95:       <a href=\"#M000358\">assert_not_running</a>&nbsp;&nbsp;\n   96:       <a href=\"#M000347\">assert_not_street</a>&nbsp;&nbsp;\n   97:       <a href=\"#M000357\">assert_running</a>&nbsp;&nbsp;\n   98:       <a href=\"#M000356\">assert_some_beepers</a>&nbsp;&nbsp;\n   99:       <a href=\"#M000346\">assert_street</a>&nbsp;&nbsp;\n  100        </div>\n  101      </div>\n  ...\n  123  \n  124          <div class=\"method-heading\">\n  125:           <a href=\"Assertions.src/M000350.html\" target=\"Code\" class=\"method-signature\"\n  126:             onclick=\"popupCode('Assertions.src/M000350.html');return false;\">\n  127:           <span class=\"method-name\">assert_at</span><span class=\"method-args\">(street, avenue)</span>\n  128            </a>\n  129          </div>\n  ...\n  131          <div class=\"method-description\">\n  132            <p>\n  133: Assert the robot is on a specified corner\n  134  </p>\n  135          </div>\n  ...\n  140  \n  141          <div class=\"method-heading\">\n  142:           <a href=\"Assertions.src/M000348.html\" target=\"Code\" class=\"method-signature\"\n  143:             onclick=\"popupCode('Assertions.src/M000348.html');return false;\">\n  144:           <span class=\"method-name\">assert_avenue</span><span class=\"method-args\">(avenue)</span>\n  145            </a>\n  146          </div>\n  ...\n  148          <div class=\"method-description\">\n  149            <p>\n  150: Assert the robot is on a specified avenue\n  151  </p>\n  152          </div>\n  ...\n  157  \n  158          <div class=\"method-heading\">\n  159:           <a href=\"Assertions.src/M000354.html\" target=\"Code\" class=\"method-signature\"\n  160:             onclick=\"popupCode('Assertions.src/M000354.html');return false;\">\n  161:           <span class=\"method-name\">assert_beepers</span><span class=\"method-args\">(howMany)</span>\n  162            </a>\n  163          </div>\n  ...\n  165          <div class=\"method-description\">\n  166            <p>\n  167: Assert the robot has precisely the number of beepers given in its beeper\n  168  bag\n  169  </p>\n  ...\n  175  \n  176          <div class=\"method-heading\">\n  177:           <a href=\"Assertions.src/M000352.html\" target=\"Code\" class=\"method-signature\"\n  178:             onclick=\"popupCode('Assertions.src/M000352.html');return false;\">\n  179:           <span class=\"method-name\">assert_facing</span><span class=\"method-args\">(direction)</span>\n  180            </a>\n  181          </div>\n  ...\n  183          <div class=\"method-description\">\n  184            <p>\n  185: Assert the robot is facing the given direction\n  186  </p>\n  187          </div>\n  ...\n  192  \n  193          <div class=\"method-heading\">\n  194:           <a href=\"Assertions.src/M000360.html\" target=\"Code\" class=\"method-signature\"\n  195:             onclick=\"popupCode('Assertions.src/M000360.html');return false;\">\n  196:           <span class=\"method-name\">assert_front_blocked</span><span class=\"method-args\">()</span>\n  197            </a>\n  198          </div>\n  ...\n  200          <div class=\"method-description\">\n  201            <p>\n  202: Assert the robot&#8216;s front is blocked\n  203  </p>\n  204          </div>\n  ...\n  209  \n  210          <div class=\"method-heading\">\n  211:           <a href=\"Assertions.src/M000359.html\" target=\"Code\" class=\"method-signature\"\n  212:             onclick=\"popupCode('Assertions.src/M000359.html');return false;\">\n  213:           <span class=\"method-name\">assert_front_clear</span><span class=\"method-args\">()</span>\n  214            </a>\n  215          </div>\n  ...\n  217          <div class=\"method-description\">\n  218            <p>\n  219: Assert the robot&#8216;s front is clear\n  220  </p>\n  221          </div>\n  ...\n  226  \n  227          <div class=\"method-heading\">\n  228:           <a href=\"Assertions.src/M000361.html\" target=\"Code\" class=\"method-signature\"\n  229:             onclick=\"popupCode('Assertions.src/M000361.html');return false;\">\n  230:           <span class=\"method-name\">assert_neighbors</span><span class=\"method-args\">()</span>\n  231            </a>\n  232          </div>\n  ...\n  234          <div class=\"method-description\">\n  235            <p>\n  236: Assert a robot has at least one neighbor\n  237  </p>\n  238          </div>\n  ...\n  243  \n  244          <div class=\"method-heading\">\n  245:           <a href=\"Assertions.src/M000362.html\" target=\"Code\" class=\"method-signature\"\n  246:             onclick=\"popupCode('Assertions.src/M000362.html');return false;\">\n  247:           <span class=\"method-name\">assert_no_neighbors</span><span class=\"method-args\">()</span>\n  248            </a>\n  249          </div>\n  ...\n  251          <div class=\"method-description\">\n  252            <p>\n  253: Assert a robot has no neighbors\n  254  </p>\n  255          </div>\n  ...\n  260  \n  261          <div class=\"method-heading\">\n  262:           <a href=\"Assertions.src/M000351.html\" target=\"Code\" class=\"method-signature\"\n  263:             onclick=\"popupCode('Assertions.src/M000351.html');return false;\">\n  264:           <span class=\"method-name\">assert_not_at</span><span class=\"method-args\">(street, avenue)</span>\n  265            </a>\n  266          </div>\n  ...\n  268          <div class=\"method-description\">\n  269            <p>\n  270: Assert the robot is not on a specified corner\n  271  </p>\n  272          </div>\n  ...\n  277  \n  278          <div class=\"method-heading\">\n  279:           <a href=\"Assertions.src/M000349.html\" target=\"Code\" class=\"method-signature\"\n  280:             onclick=\"popupCode('Assertions.src/M000349.html');return false;\">\n  281:           <span class=\"method-name\">assert_not_avenue</span><span class=\"method-args\">(avenue)</span>\n  282            </a>\n  283          </div>\n  ...\n  285          <div class=\"method-description\">\n  286            <p>\n  287: Assert the robot is not on a specified avenue\n  288  </p>\n  289          </div>\n  ...\n  294  \n  295          <div class=\"method-heading\">\n  296:           <a href=\"Assertions.src/M000355.html\" target=\"Code\" class=\"method-signature\"\n  297:             onclick=\"popupCode('Assertions.src/M000355.html');return false;\">\n  298:           <span class=\"method-name\">assert_not_beepers</span><span class=\"method-args\">(howMany)</span>\n  299            </a>\n  300          </div>\n  ...\n  302          <div class=\"method-description\">\n  303            <p>\n  304: Assert the robot does not have precisely the number of beepers given in its\n  305  beeper bag\n  306  </p>\n  ...\n  312  \n  313          <div class=\"method-heading\">\n  314:           <a href=\"Assertions.src/M000353.html\" target=\"Code\" class=\"method-signature\"\n  315:             onclick=\"popupCode('Assertions.src/M000353.html');return false;\">\n  316:           <span class=\"method-name\">assert_not_facing</span><span class=\"method-args\">(direction)</span>\n  317            </a>\n  318          </div>\n  ...\n  320          <div class=\"method-description\">\n  321            <p>\n  322: Assert the robot is not facing the given direction\n  323  </p>\n  324          </div>\n  ...\n  329  \n  330          <div class=\"method-heading\">\n  331:           <a href=\"Assertions.src/M000358.html\" target=\"Code\" class=\"method-signature\"\n  332:             onclick=\"popupCode('Assertions.src/M000358.html');return false;\">\n  333:           <span class=\"method-name\">assert_not_running</span><span class=\"method-args\">()</span>\n  334            </a>\n  335          </div>\n  ...\n  337          <div class=\"method-description\">\n  338            <p>\n  339: Assert the robot is not running\n  340  </p>\n  341          </div>\n  ...\n  346  \n  347          <div class=\"method-heading\">\n  348:           <a href=\"Assertions.src/M000347.html\" target=\"Code\" class=\"method-signature\"\n  349:             onclick=\"popupCode('Assertions.src/M000347.html');return false;\">\n  350:           <span class=\"method-name\">assert_not_street</span><span class=\"method-args\">(street)</span>\n  351            </a>\n  352          </div>\n  ...\n  354          <div class=\"method-description\">\n  355            <p>\n  356: Assert the robot is not on a specified street\n  357  </p>\n  358          </div>\n  ...\n  363  \n  364          <div class=\"method-heading\">\n  365:           <a href=\"Assertions.src/M000357.html\" target=\"Code\" class=\"method-signature\"\n  366:             onclick=\"popupCode('Assertions.src/M000357.html');return false;\">\n  367:           <span class=\"method-name\">assert_running</span><span class=\"method-args\">()</span>\n  368            </a>\n  369          </div>\n  ...\n  371          <div class=\"method-description\">\n  372            <p>\n  373: Assert the robot is running\n  374  </p>\n  375          </div>\n  ...\n  380  \n  381          <div class=\"method-heading\">\n  382:           <a href=\"Assertions.src/M000356.html\" target=\"Code\" class=\"method-signature\"\n  383:             onclick=\"popupCode('Assertions.src/M000356.html');return false;\">\n  384:           <span class=\"method-name\">assert_some_beepers</span><span class=\"method-args\">()</span>\n  385            </a>\n  386          </div>\n  ...\n  388          <div class=\"method-description\">\n  389            <p>\n  390: Assert the robot has some beepers (i.e. not 0)\n  391  </p>\n  392          </div>\n  ...\n  397  \n  398          <div class=\"method-heading\">\n  399:           <a href=\"Assertions.src/M000346.html\" target=\"Code\" class=\"method-signature\"\n  400:             onclick=\"popupCode('Assertions.src/M000346.html');return false;\">\n  401:           <span class=\"method-name\">assert_street</span><span class=\"method-args\">(street)</span>\n  402            </a>\n  403          </div>\n  ...\n  405          <div class=\"method-description\">\n  406            <p>\n  407: Assert the robot is on a specified street\n  408  </p>\n  409          </div>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Robota.html:\n   83  A general framework in which robots of various kinds may be defined. It\n   84  does not, however, define any instantiable robots. The actions of robots\n   85: are declared, but not defined here. Also defined is an assertion API that\n   86: the programmer may use to make assertions about the state of a robot. the\n   87  requires (above) determine whether the world is graphical or text based.\n   88  </p>\n   ..\n  119  \n  120        <div id=\"includes-list\">\n  121:         <span class=\"include-name\"><a href=\"Assertions.html\">Assertions</a></span>\n  122        </div>\n  123      </div>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.html:\n   96  \n   97        <div class=\"name-list\">\n   98:       <a href=\"#M000295\">assert_beepers_at</a>&nbsp;&nbsp;\n   99:       <a href=\"#M000294\">assert_robots_at</a>&nbsp;&nbsp;\n  100        <a href=\"#M000292\">beepers_at?</a>&nbsp;&nbsp;\n  101        <a href=\"#M000283\">clear</a>&nbsp;&nbsp;\n  ...\n  223            <a href=\"RobotWorldBase.src/M000295.html\" target=\"Code\" class=\"method-signature\"\n  224              onclick=\"popupCode('RobotWorldBase.src/M000295.html');return false;\">\n  225:           <span class=\"method-name\">assert_beepers_at</span><span class=\"method-args\">(street, avenue)</span>\n  226            </a>\n  227          </div>\n  ...\n  240            <a href=\"RobotWorldBase.src/M000294.html\" target=\"Code\" class=\"method-signature\"\n  241              onclick=\"popupCode('RobotWorldBase.src/M000294.html');return false;\">\n  242:           <span class=\"method-name\">assert_robots_at</span><span class=\"method-args\">(street, avenue)</span>\n  243            </a>\n  244          </div>\n  ...\n  298          <div class=\"method-description\">\n  299            <p>\n  300: Assert that the given corner is in the world\n  301  </p>\n  302          </div>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000346.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_street (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 5</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-identifier\">street</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is not on street: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">street</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@street</span> <span class=\"ruby-operator\">!=</span> <span class=\"ruby-identifier\">street</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000347.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_street (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 10</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_street</span>(<span class=\"ruby-identifier\">street</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is on street: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">street</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@street</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-identifier\">street</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000348.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_avenue (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 15</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is not on avenue: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">avenue</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@avenue</span> <span class=\"ruby-operator\">!=</span> <span class=\"ruby-identifier\">avenue</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000349.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_avenue (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 20</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_avenue</span>(<span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is on avenue: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">avenue</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@avenue</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-identifier\">avenue</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000350.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_at (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 25</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15:     <span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-identifier\">street</span>)\n   16:     <span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-identifier\">avenue</span>)\n   17    <span class=\"ruby-keyword kw\">end</span></pre>\n   18  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000351.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_at (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 31</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is at: (&quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">street</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-value str\">&quot;, &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">avenue</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-value str\">&quot;)&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@street</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-identifier\">street</span> <span class=\"ruby-operator\">&amp;&amp;</span> <span class=\"ruby-identifier\">avenue</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-identifier\">avenue</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000352.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_facing (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 36</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-identifier\">direction</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is not facing: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">direction</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@direction</span> <span class=\"ruby-operator\">!=</span> <span class=\"ruby-identifier\">direction</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000353.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_facing (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 41</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_facing</span>(<span class=\"ruby-identifier\">direction</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is facing: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">direction</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@direction</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-identifier\">direction</span>\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000354.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_beepers (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 46</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-identifier\">howMany</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot does not have exactly &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">howMany</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-value str\">&quot; beepers.&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@beepers</span> <span class=\"ruby-operator\">!=</span> <span class=\"ruby-identifier\">howMany</span>    \n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000355.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_beepers (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 51</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_beepers</span>(<span class=\"ruby-identifier\">howMany</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot does have exactly &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-identifier\">howMany</span>.<span class=\"ruby-identifier\">to_s</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-value str\">&quot; beepers.&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@beepers</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-identifier\">howMany</span>    \n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000356.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_some_beepers (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 56</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_some_beepers</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot has no beepers &quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@beepers</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-value\">0</span>    \n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000357.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_running (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 61</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_running</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is not running&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-keyword kw\">not</span> <span class=\"ruby-identifier\">running?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000358.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_running (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 66</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_running</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is running&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-identifier\">running?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000359.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_front_clear (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 71</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_front_clear</span>()\n   15        <span class=\"ruby-keyword kw\">begin</span>\n   16            <span class=\"ruby-identifier\">street</span> = <span class=\"ruby-ivar\">@direction</span>.<span class=\"ruby-identifier\">next_street</span>(<span class=\"ruby-ivar\">@street</span>, <span class=\"ruby-ivar\">@avenue</span>)\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000360.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_front_blocked (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 80</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_front_blocked</span>()\n   15        <span class=\"ruby-keyword kw\">begin</span>\n   16            <span class=\"ruby-identifier\">street</span> = <span class=\"ruby-ivar\">@direction</span>.<span class=\"ruby-identifier\">next_street</span>(<span class=\"ruby-ivar\">@street</span>, <span class=\"ruby-ivar\">@avenue</span>)\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000361.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_neighbors (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 91</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_neighbors</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot has no neighbor&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">empty?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000362.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_no_neighbors (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 95</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_no_neighbors</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot has no neighbor&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-keyword kw\">not</span> <span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">empty?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000363.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_some_beepers (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 56</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_some_beepers</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot has no beepers &quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-ivar\">@beepers</span> <span class=\"ruby-operator\">==</span> <span class=\"ruby-value\">0</span>    \n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000364.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_running (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 61</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_running</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is not running&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-keyword kw\">not</span> <span class=\"ruby-identifier\">running?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000365.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_not_running (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 66</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_not_running</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot is running&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-identifier\">running?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000366.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_front_clear (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 71</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_front_clear</span>()\n   15        <span class=\"ruby-keyword kw\">begin</span>\n   16            <span class=\"ruby-identifier\">street</span> = <span class=\"ruby-ivar\">@direction</span>.<span class=\"ruby-identifier\">next_street</span>(<span class=\"ruby-ivar\">@street</span>, <span class=\"ruby-ivar\">@avenue</span>)\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000367.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_front_blocked (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 80</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_front_blocked</span>()\n   15        <span class=\"ruby-keyword kw\">begin</span>\n   16            <span class=\"ruby-identifier\">street</span> = <span class=\"ruby-ivar\">@direction</span>.<span class=\"ruby-identifier\">next_street</span>(<span class=\"ruby-ivar\">@street</span>, <span class=\"ruby-ivar\">@avenue</span>)\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000368.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_neighbors (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 91</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_neighbors</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot has no neighbor&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">empty?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Assertions.src/M000369.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_no_neighbors (Assertions)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   11  </head>\n   12  <body class=\"standalone-code\">\n   13:   <pre><span class=\"ruby-comment cmt\"># File karel/assertions.rb, line 95</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_no_neighbors</span>()\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-value str\">&quot;Robot has no neighbor&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-keyword kw\">not</span> <span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">empty?</span>()\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000105.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_robots_at (RobotWorldBase)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   ..\n   12  <body class=\"standalone-code\">\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/robot_world_base.rb, line 129</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_robots_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-constant\">NoRobots</span>, <span class=\"ruby-node\">&quot;(#{street}, #{avenue})&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-operator\">!</span> <span class=\"ruby-identifier\">robots_at?</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000106.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_beepers_at (RobotWorldBase)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   ..\n   12  <body class=\"standalone-code\">\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/robot_world_base.rb, line 134</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-constant\">NoBeepers</span>, <span class=\"ruby-node\">&quot;(#{street}, #{avenue})&quot;</span> <span class=\"ruby-keyword kw\">if</span>  <span class=\"ruby-operator\">!</span> <span class=\"ruby-identifier\">beepers_at?</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000107.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">neighbors_of</span>(<span class=\"ruby-identifier\">robot</span>, <span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">result</span> = []\n   16:     <span class=\"ruby-identifier\">robot</span>.<span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   17      <span class=\"ruby-ivar\">@Robots</span>.<span class=\"ruby-identifier\">keys</span>.<span class=\"ruby-identifier\">each</span> <span class=\"ruby-keyword kw\">do</span> <span class=\"ruby-operator\">|</span><span class=\"ruby-identifier\">anyRobot</span><span class=\"ruby-operator\">|</span>\n   18        <span class=\"ruby-identifier\">state</span> = <span class=\"ruby-ivar\">@Robots</span>[<span class=\"ruby-identifier\">anyRobot</span>]\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000178.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_robots_at (RobotWorldBase)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   ..\n   12  <body class=\"standalone-code\">\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/robot_world_base.rb, line 135</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_robots_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-constant\">NoRobots</span>, <span class=\"ruby-node\">&quot;(#{street}, #{avenue})&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-operator\">!</span> <span class=\"ruby-identifier\">robots_at?</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000179.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_beepers_at (RobotWorldBase)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   ..\n   12  <body class=\"standalone-code\">\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/robot_world_base.rb, line 140</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-constant\">NoBeepers</span>, <span class=\"ruby-node\">&quot;(#{street}, #{avenue})&quot;</span> <span class=\"ruby-keyword kw\">if</span>  <span class=\"ruby-operator\">!</span> <span class=\"ruby-identifier\">beepers_at?</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000180.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">neighbors_of</span>(<span class=\"ruby-identifier\">robot</span>, <span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">result</span> = []\n   16:     <span class=\"ruby-identifier\">robot</span>.<span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   17      <span class=\"ruby-ivar\">@Robots</span>.<span class=\"ruby-identifier\">keys</span>.<span class=\"ruby-identifier\">each</span> <span class=\"ruby-keyword kw\">do</span> <span class=\"ruby-operator\">|</span><span class=\"ruby-identifier\">anyRobot</span><span class=\"ruby-operator\">|</span>\n   18        <span class=\"ruby-identifier\">state</span> = <span class=\"ruby-ivar\">@Robots</span>[<span class=\"ruby-identifier\">anyRobot</span>]\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000294.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_robots_at (RobotWorldBase)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   ..\n   12  <body class=\"standalone-code\">\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/robot_world_base.rb, line 136</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_robots_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-constant\">NoRobots</span>, <span class=\"ruby-node\">&quot;(#{street}, #{avenue})&quot;</span> <span class=\"ruby-keyword kw\">if</span> <span class=\"ruby-operator\">!</span> <span class=\"ruby-identifier\">robots_at?</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000295.html:\n    6  <html>\n    7  <head>\n    8:   <title>assert_beepers_at (RobotWorldBase)</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <link rel=\"stylesheet\" href=\"../.././rdoc-style.css\" type=\"text/css\" media=\"screen\" />\n   ..\n   12  <body class=\"standalone-code\">\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/robot_world_base.rb, line 141</span>\n   14:   <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">raise</span> <span class=\"ruby-constant\">NoBeepers</span>, <span class=\"ruby-node\">&quot;(#{street}, #{avenue})&quot;</span> <span class=\"ruby-keyword kw\">if</span>  <span class=\"ruby-operator\">!</span> <span class=\"ruby-identifier\">beepers_at?</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/RobotWorldBase.src/M000296.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">neighbors_of</span>(<span class=\"ruby-identifier\">robot</span>, <span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   15      <span class=\"ruby-identifier\">result</span> = []\n   16:     <span class=\"ruby-identifier\">robot</span>.<span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-identifier\">street</span>, <span class=\"ruby-identifier\">avenue</span>)\n   17      <span class=\"ruby-ivar\">@Robots</span>.<span class=\"ruby-identifier\">keys</span>.<span class=\"ruby-identifier\">each</span> <span class=\"ruby-keyword kw\">do</span> <span class=\"ruby-operator\">|</span><span class=\"ruby-identifier\">anyRobot</span><span class=\"ruby-operator\">|</span>\n   18        <span class=\"ruby-identifier\">state</span> = <span class=\"ruby-ivar\">@Robots</span>[<span class=\"ruby-identifier\">anyRobot</span>]\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000196.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_turn</span>\n   15      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   16:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">WEST</span>)\n   17      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   18:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>)\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">EAST</span>)\n   21      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   22:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>)\n   23:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_no_neighbors</span>()\n   24:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_running</span>()\n   25:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_front_clear</span>()\n   26      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_off</span>()\n   27:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_not_running</span>()\n   28    <span class=\"ruby-keyword kw\">end</span></pre>\n   29  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000197.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_simple_move</span>\n   15      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   16:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-value\">4</span>)\n   17:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-value\">3</span>)\n   18      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-value\">4</span>)\n   21:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-value\">2</span>)\n   22      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   23      <span class=\"ruby-comment cmt\">#@karel.move  </span>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000198.html:\n   15      <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">place_beeper</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   16      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">pick_beeper</span>\n   17:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-value\">1</span>)\n   18:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_some_beepers</span>()\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">put_beeper</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-value\">0</span>)\n   21:     <span class=\"ruby-comment cmt\"># @karel.assert_beepers(1)</span>\n   22    <span class=\"ruby-keyword kw\">end</span></pre>\n   23  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000199.html:\n   25      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   26      <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-value str\">&quot;neighbors: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">to_s</span>\n   27:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">WEST</span>)\n   28      <span class=\"ruby-comment cmt\">#   begin</span>\n   29      <span class=\"ruby-comment cmt\">#     @karel.move</span>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000200.html:\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/test_robots.rb, line 88</span>\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_misc</span>\n   15:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value str\">&quot;North&quot;</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>.<span class=\"ruby-identifier\">to_s</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n   17  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000201.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">testExceptions</span>\n   15      <span class=\"ruby-comment cmt\">#  @karel.pick_beeper</span>\n   16:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">NoBeepers</span>){<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">pick_beeper</span>}\n   17  <span class=\"ruby-comment cmt\">#    begin</span>\n   18  <span class=\"ruby-comment cmt\">#      @karel.pick_beeper</span>\n   ..\n   21  <span class=\"ruby-comment cmt\">#    end</span>\n   22      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">UrRobot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>, <span class=\"ruby-value\">0</span>)\n   23:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_front_blocked</span>\n   24      <span class=\"ruby-comment cmt\">#   @karel.put_beeper</span>\n   25      <span class=\"ruby-comment cmt\">#@karel.turnRight</span>\n   26      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_off</span>\n   27      <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">to_s</span>\n   28:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">RobotNotRunning</span>){ <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>}\n   29  <span class=\"ruby-comment cmt\">#    begin</span>\n   30  <span class=\"ruby-comment cmt\">#      @karel.turn_left</span>\n   ..\n   34  <span class=\"ruby-comment cmt\">#    end</span>\n   35      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">UrRobot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>, <span class=\"ruby-value\">0</span>)\n   36:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">FrontIsBlocked</span>){<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>}\n   37:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">RobotNotRunning</span>){ <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>}\n   38    <span class=\"ruby-keyword kw\">end</span></pre>\n   39  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000202.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_robots</span>\n   15      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">Robot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>, <span class=\"ruby-value\">3</span>)\n   16:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">any_beepers_in_beeper_bag?</span>)  \n   17:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">facing_north?</span>)\n   18:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">next_to_a_beeper?</span>)\n   19:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">facing_east?</span>)\n   20:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">front_is_clear?</span>)\n   21      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   22:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">front_is_clear?</span>)\n   23    <span class=\"ruby-keyword kw\">end</span></pre>\n   24  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000203.html:\n   16      <span class=\"ruby-ivar\">@mary</span> = <span class=\"ruby-constant\">Robot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>, <span class=\"ruby-value\">1</span>)\n   17      <span class=\"ruby-identifier\">val</span> = <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">each</span>{<span class=\"ruby-operator\">|</span><span class=\"ruby-identifier\">neighbor</span><span class=\"ruby-operator\">|</span> <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-identifier\">neighbor</span>.<span class=\"ruby-identifier\">to_s</span>}\n   18:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value str\">&quot;Array&quot;</span>, <span class=\"ruby-identifier\">val</span>.<span class=\"ruby-identifier\">class</span>.<span class=\"ruby-identifier\">to_s</span>)\n   19:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value\">2</span>, <span class=\"ruby-identifier\">val</span>.<span class=\"ruby-identifier\">length</span>)\n   20:     <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_robots_at</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   21:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">NoBeepers</span>){<span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)}\n   22      <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">place_beeper</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)\n   23:     <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)\n   24:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@charlie</span>.<span class=\"ruby-identifier\">next_to_a_robot?</span>)\n   25:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   26    <span class=\"ruby-keyword kw\">end</span></pre>\n   27  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000219.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_turn</span>\n   15      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   16:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">WEST</span>)\n   17      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   18:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>)\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">EAST</span>)\n   21      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   22:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>)\n   23:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_no_neighbors</span>()\n   24:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_running</span>()\n   25:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_front_clear</span>()\n   26      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_off</span>()\n   27:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_not_running</span>()\n   28    <span class=\"ruby-keyword kw\">end</span></pre>\n   29  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000220.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_simple_move</span>\n   15      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   16:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-value\">4</span>)\n   17:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-value\">3</span>)\n   18      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-value\">4</span>)\n   21:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-value\">2</span>)\n   22      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   23      <span class=\"ruby-comment cmt\">#@karel.move  </span>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000221.html:\n   15      <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">place_beeper</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   16      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">pick_beeper</span>\n   17:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-value\">1</span>)\n   18:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_some_beepers</span>()\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">put_beeper</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-value\">0</span>)\n   21:     <span class=\"ruby-comment cmt\"># @karel.assert_beepers(1)</span>\n   22    <span class=\"ruby-keyword kw\">end</span></pre>\n   23  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000222.html:\n   25      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   26      <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-value str\">&quot;neighbors: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">to_s</span>\n   27:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">WEST</span>)\n   28      <span class=\"ruby-comment cmt\">#   begin</span>\n   29      <span class=\"ruby-comment cmt\">#     @karel.move</span>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000223.html:\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/test_robots.rb, line 88</span>\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_misc</span>\n   15:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value str\">&quot;North&quot;</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>.<span class=\"ruby-identifier\">to_s</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n   17  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000224.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">testExceptions</span>\n   15      <span class=\"ruby-comment cmt\">#  @karel.pick_beeper</span>\n   16:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">NoBeepers</span>){<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">pick_beeper</span>}\n   17  <span class=\"ruby-comment cmt\">#    begin</span>\n   18  <span class=\"ruby-comment cmt\">#      @karel.pick_beeper</span>\n   ..\n   21  <span class=\"ruby-comment cmt\">#    end</span>\n   22      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">UrRobot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>, <span class=\"ruby-value\">0</span>)\n   23:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_front_blocked</span>\n   24      <span class=\"ruby-comment cmt\">#   @karel.put_beeper</span>\n   25      <span class=\"ruby-comment cmt\">#@karel.turnRight</span>\n   26      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_off</span>\n   27      <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">to_s</span>\n   28:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">RobotNotRunning</span>){ <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>}\n   29  <span class=\"ruby-comment cmt\">#    begin</span>\n   30  <span class=\"ruby-comment cmt\">#      @karel.turn_left</span>\n   ..\n   34  <span class=\"ruby-comment cmt\">#    end</span>\n   35      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">UrRobot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>, <span class=\"ruby-value\">0</span>)\n   36:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">FrontIsBlocked</span>){<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>}\n   37:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">RobotNotRunning</span>){ <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>}\n   38    <span class=\"ruby-keyword kw\">end</span></pre>\n   39  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000225.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_robots</span>\n   15      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">Robot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>, <span class=\"ruby-value\">3</span>)\n   16:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">any_beepers_in_beeper_bag?</span>)  \n   17:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">facing_north?</span>)\n   18:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">next_to_a_beeper?</span>)\n   19:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">facing_east?</span>)\n   20:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">front_is_clear?</span>)\n   21      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   22:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">front_is_clear?</span>)\n   23    <span class=\"ruby-keyword kw\">end</span></pre>\n   24  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000226.html:\n   16      <span class=\"ruby-ivar\">@mary</span> = <span class=\"ruby-constant\">Robot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>, <span class=\"ruby-value\">1</span>)\n   17      <span class=\"ruby-identifier\">val</span> = <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">each</span>{<span class=\"ruby-operator\">|</span><span class=\"ruby-identifier\">neighbor</span><span class=\"ruby-operator\">|</span> <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-identifier\">neighbor</span>.<span class=\"ruby-identifier\">to_s</span>}\n   18:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value str\">&quot;Array&quot;</span>, <span class=\"ruby-identifier\">val</span>.<span class=\"ruby-identifier\">class</span>.<span class=\"ruby-identifier\">to_s</span>)\n   19:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value\">2</span>, <span class=\"ruby-identifier\">val</span>.<span class=\"ruby-identifier\">length</span>)\n   20:     <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_robots_at</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   21:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">NoBeepers</span>){<span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)}\n   22      <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">place_beeper</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)\n   23:     <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)\n   24:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@charlie</span>.<span class=\"ruby-identifier\">next_to_a_robot?</span>)\n   25:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   26    <span class=\"ruby-keyword kw\">end</span></pre>\n   27  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000299.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_turn</span>\n   15      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   16:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">WEST</span>)\n   17      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   18:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>)\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">EAST</span>)\n   21      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   22:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>)\n   23:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_no_neighbors</span>()\n   24:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_running</span>()\n   25:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_front_clear</span>()\n   26      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_off</span>()\n   27:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_not_running</span>()\n   28    <span class=\"ruby-keyword kw\">end</span></pre>\n   29  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000300.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_simple_move</span>\n   15      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   16:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-value\">4</span>)\n   17:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-value\">3</span>)\n   18      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_street</span>(<span class=\"ruby-value\">4</span>)\n   21:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_avenue</span>(<span class=\"ruby-value\">2</span>)\n   22      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>\n   23      <span class=\"ruby-comment cmt\">#@karel.move  </span>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000301.html:\n   15      <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">place_beeper</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   16      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">pick_beeper</span>\n   17:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-value\">1</span>)\n   18:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_some_beepers</span>()\n   19      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">put_beeper</span>\n   20:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_beepers</span>(<span class=\"ruby-value\">0</span>)\n   21:     <span class=\"ruby-comment cmt\"># @karel.assert_beepers(1)</span>\n   22    <span class=\"ruby-keyword kw\">end</span></pre>\n   23  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000302.html:\n   25      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   26      <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-value str\">&quot;neighbors: &quot;</span> <span class=\"ruby-operator\">+</span> <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">to_s</span>\n   27:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_facing</span>(<span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">WEST</span>)\n   28      <span class=\"ruby-comment cmt\">#   begin</span>\n   29      <span class=\"ruby-comment cmt\">#     @karel.move</span>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000303.html:\n   13    <pre><span class=\"ruby-comment cmt\"># File karel/test_robots.rb, line 88</span>\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_misc</span>\n   15:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value str\">&quot;North&quot;</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>.<span class=\"ruby-identifier\">to_s</span>)\n   16    <span class=\"ruby-keyword kw\">end</span></pre>\n   17  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000304.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">testExceptions</span>\n   15      <span class=\"ruby-comment cmt\">#  @karel.pick_beeper</span>\n   16:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">NoBeepers</span>){<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">pick_beeper</span>}\n   17  <span class=\"ruby-comment cmt\">#    begin</span>\n   18  <span class=\"ruby-comment cmt\">#      @karel.pick_beeper</span>\n   ..\n   21  <span class=\"ruby-comment cmt\">#    end</span>\n   22      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">UrRobot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>, <span class=\"ruby-value\">0</span>)\n   23:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_front_blocked</span>\n   24      <span class=\"ruby-comment cmt\">#   @karel.put_beeper</span>\n   25      <span class=\"ruby-comment cmt\">#@karel.turnRight</span>\n   26      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_off</span>\n   27      <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">to_s</span>\n   28:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">RobotNotRunning</span>){ <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>}\n   29  <span class=\"ruby-comment cmt\">#    begin</span>\n   30  <span class=\"ruby-comment cmt\">#      @karel.turn_left</span>\n   ..\n   34  <span class=\"ruby-comment cmt\">#    end</span>\n   35      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">UrRobot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">SOUTH</span>, <span class=\"ruby-value\">0</span>)\n   36:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">FrontIsBlocked</span>){<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">move</span>}\n   37:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">RobotNotRunning</span>){ <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>}\n   38    <span class=\"ruby-keyword kw\">end</span></pre>\n   39  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000305.html:\n   14    <span class=\"ruby-keyword kw\">def</span> <span class=\"ruby-identifier\">test_robots</span>\n   15      <span class=\"ruby-ivar\">@karel</span> = <span class=\"ruby-constant\">Robot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">1</span>, <span class=\"ruby-value\">1</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>, <span class=\"ruby-value\">3</span>)\n   16:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">any_beepers_in_beeper_bag?</span>)  \n   17:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">facing_north?</span>)\n   18:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">next_to_a_beeper?</span>)\n   19:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">facing_east?</span>)\n   20:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">front_is_clear?</span>)\n   21      <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">turn_left</span>\n   22:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-keyword kw\">false</span>, <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">front_is_clear?</span>)\n   23    <span class=\"ruby-keyword kw\">end</span></pre>\n   24  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/TestRobots.src/M000306.html:\n   16      <span class=\"ruby-ivar\">@mary</span> = <span class=\"ruby-constant\">Robot</span>.<span class=\"ruby-identifier\">new</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>, <span class=\"ruby-constant\">Robota</span><span class=\"ruby-operator\">::</span><span class=\"ruby-constant\">NORTH</span>, <span class=\"ruby-value\">1</span>)\n   17      <span class=\"ruby-identifier\">val</span> = <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">neighbors</span>.<span class=\"ruby-identifier\">each</span>{<span class=\"ruby-operator\">|</span><span class=\"ruby-identifier\">neighbor</span><span class=\"ruby-operator\">|</span> <span class=\"ruby-identifier\">puts</span> <span class=\"ruby-identifier\">neighbor</span>.<span class=\"ruby-identifier\">to_s</span>}\n   18:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value str\">&quot;Array&quot;</span>, <span class=\"ruby-identifier\">val</span>.<span class=\"ruby-identifier\">class</span>.<span class=\"ruby-identifier\">to_s</span>)\n   19:     <span class=\"ruby-identifier\">assert_equal</span>(<span class=\"ruby-value\">2</span>, <span class=\"ruby-identifier\">val</span>.<span class=\"ruby-identifier\">length</span>)\n   20:     <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_robots_at</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   21:     <span class=\"ruby-identifier\">assert_raise</span>(<span class=\"ruby-constant\">NoBeepers</span>){<span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)}\n   22      <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">place_beeper</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)\n   23:     <span class=\"ruby-ivar\">@world</span>.<span class=\"ruby-identifier\">assert_beepers_at</span>(<span class=\"ruby-value\">3</span>,<span class=\"ruby-value\">3</span>)\n   24:     <span class=\"ruby-identifier\">assert</span>(<span class=\"ruby-ivar\">@charlie</span>.<span class=\"ruby-identifier\">next_to_a_robot?</span>)\n   25:     <span class=\"ruby-ivar\">@karel</span>.<span class=\"ruby-identifier\">assert_at</span>(<span class=\"ruby-value\">3</span>, <span class=\"ruby-value\">3</span>)\n   26    <span class=\"ruby-keyword kw\">end</span></pre>\n   27  </body>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/files/karel/assertions_rb.html:\n    6  <html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\n    7  <head>\n    8:   <title>File: assertions.rb</title>\n    9    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\" />\n   10    <meta http-equiv=\"Content-Script-Type\" content=\"text/javascript\" />\n   ..\n   48  \n   49    <div id=\"fileHeader\">\n   50:     <h1>assertions.rb</h1>\n   51      <table class=\"header-table\">\n   52      <tr class=\"top-aligned-row\">\n   53        <td><strong>Path:</strong></td>\n   54:       <td>karel/assertions.rb\n   55        </td>\n   56      </tr>\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/files/karel/robota_rb.html:\n   82        <div class=\"name-list\">\n   83        direction&nbsp;&nbsp;\n   84:       assertions&nbsp;&nbsp;\n   85        tk_robot_world&nbsp;&nbsp;\n   86        robot_world&nbsp;&nbsp;\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot_world_base.rb:\n   35   end\n   36    \n   37:   # Assert that the given corner is in the world\n   38    def legal_corner(street, avenue)\n   39      raise IllegalCorner \"(#{street}, #{avenue})\" if street < 1 || avenue < 1\n   ..\n  134    \n  135    # Fail if there are no robots on the given corner\n  136:   def assert_robots_at(street, avenue)\n  137      raise NoRobots, \"(#{street}, #{avenue})\" if ! robots_at?(street, avenue)\n  138    end\n  139    \n  140    # Fail if there are no robots on the given corner\n  141:   def assert_beepers_at(street, avenue)\n  142      raise NoBeepers, \"(#{street}, #{avenue})\" if  ! beepers_at?(street, avenue)\n  143    end\n  ...\n  147    def neighbors_of(robot, street, avenue)\n  148      result = []\n  149:     robot.assert_at(street, avenue)\n  150      @Robots.keys.each do |anyRobot|\n  151        state = @Robots[anyRobot]\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robota.rb:\n    3  \n    4  require_relative \"direction\"\n    5: require_relative \"../mixins/assertions\"\n    6  \n    7  $INFINITY = -1\n    .\n   25  # A general framework in which robots of various kinds may be defined. It does not, however, define\n   26  # any instantiable robots. The actions of robots are declared, but not defined here. Also defined is\n   27: # an assertion API that the programmer may use to make assertions about the state of a robot. \n   28  # the requires (above) determine whether the world is graphical or text based. \n   29  class Robota\n   ..\n  133    end\n  134    \n  135:   include Assertions\n  136    \n  137  end\n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/test_robots.rb:\n   28    def test_turn\n   29      @karel.turn_left\n   30:     @karel.assert_facing(Robota::WEST)\n   31      @karel.turn_left\n   32:     @karel.assert_facing(Robota::SOUTH)\n   33      @karel.turn_left\n   34:     @karel.assert_facing(Robota::EAST)\n   35      @karel.turn_left\n   36:     @karel.assert_facing(Robota::NORTH)\n   37:     @karel.assert_no_neighbors()\n   38:     @karel.assert_running()\n   39:     @karel.assert_front_clear()\n   40      @karel.turn_off()\n   41:     @karel.assert_not_running()\n   42    end\n   43    \n   44    def test_simple_move\n   45      @karel.move\n   46:     @karel.assert_street(4)\n   47:     @karel.assert_avenue(3)\n   48      @karel.turn_left\n   49      @karel.move\n   50:     @karel.assert_street(4)\n   51:     @karel.assert_avenue(2)\n   52      @karel.move\n   53      #@karel.move  \n   ..\n   57      @world.place_beeper(3, 3)\n   58      @karel.pick_beeper\n   59:     @karel.assert_beepers(1)\n   60:     @karel.assert_some_beepers()\n   61      @karel.put_beeper\n   62:     @karel.assert_beepers(0)\n   63:     # @karel.assert_beepers(1)\n   64    end\n   65    \n   ..\n   77      @karel.turn_left\n   78      puts \"neighbors: \" + @karel.neighbors.to_s\n   79:     @karel.assert_facing(Robota::WEST)\n   80      #   begin\n   81      #     @karel.move\n   ..\n   87    \n   88    def test_misc\n   89:     assert_equal(\"North\", Robota::NORTH.to_s)\n   90    end\n   91    \n   92    def testExceptions\n   93      #  @karel.pick_beeper\n   94:     assert_raise(NoBeepers){@karel.pick_beeper}\n   95  #    begin\n   96  #      @karel.pick_beeper\n   ..\n   99  #    end\n  100      @karel = UrRobot.new(1, 1, Robota::SOUTH, 0)\n  101:     @karel.assert_front_blocked\n  102      #   @karel.put_beeper\n  103      #@karel.turnRight\n  104      @karel.turn_off\n  105      puts @karel.to_s\n  106:     assert_raise(RobotNotRunning){ @karel.turn_left}\n  107  #    begin\n  108  #      @karel.turn_left\n  ...\n  112  #    end\n  113      @karel = UrRobot.new(1, 1, Robota::SOUTH, 0)\n  114:     assert_raise(FrontIsBlocked){@karel.move}\n  115:     assert_raise(RobotNotRunning){ @karel.turn_left}\n  116    end\n  117    \n  118    def test_robots\n  119      @karel = Robot.new(1, 1, Robota::NORTH, 3)\n  120:     assert(@karel.any_beepers_in_beeper_bag?)  \n  121:     assert(@karel.facing_north?)\n  122:     assert_equal(false, @karel.next_to_a_beeper?)\n  123:     assert_equal(false, @karel.facing_east?)\n  124:     assert(@karel.front_is_clear?)\n  125      @karel.turn_left\n  126:     assert_equal(false, @karel.front_is_clear?)\n  127    end\n  128    \n  ...\n  131      @mary = Robot.new(3, 3, Robota::NORTH, 1)\n  132      val = @karel.neighbors.each{|neighbor| puts neighbor.to_s}\n  133:     assert_equal(\"Array\", val.class.to_s)\n  134:     assert_equal(2, val.length)\n  135:     @world.assert_robots_at(3, 3)\n  136:     assert_raise(NoBeepers){@world.assert_beepers_at(3,3)}\n  137      @world.place_beeper(3,3)\n  138:     @world.assert_beepers_at(3,3)\n  139:     assert(@charlie.next_to_a_robot?)\n  140:     @karel.assert_at(3, 3)\n  141    end\n  142    \n\n/home/osboxes/Documents/KarelRuby/KarelRTuesday/mixins/assertions.rb:\n    1  \n    2: module Assertions\n    3  \n    4:   # Assert the robot is on a specified street\n    5:   def assert_street(street)\n    6      raise \"Robot is not on street: \" + street.to_s if @street != street\n    7    end\n    8    \n    9:   # Assert the robot is not on a specified street\n   10:   def assert_not_street(street)\n   11      raise \"Robot is on street: \" + street.to_s if @street == street\n   12    end\n   13    \n   14:   # Assert the robot is on a specified avenue\n   15:   def assert_avenue(avenue)\n   16      raise \"Robot is not on avenue: \" + avenue.to_s if @avenue != avenue\n   17    end\n   18    \n   19:   # Assert the robot is not on a specified avenue\n   20:   def assert_not_avenue(avenue)\n   21      raise \"Robot is on avenue: \" + avenue.to_s if @avenue == avenue\n   22    end\n   23    \n   24:   # Assert the robot is on a specified corner\n   25:   def assert_at(street, avenue)\n   26:     assert_street(street)\n   27:     assert_avenue(avenue)\n   28    end\n   29    \n   30:   # Assert the robot is not on a specified corner\n   31:   def assert_not_at(street, avenue)\n   32      raise \"Robot is at: (\" + street.to_s + \", \" + avenue.to_s + \")\" if @street == street && avenue == avenue\n   33    end\n   34    \n   35:   # Assert the robot is facing the given direction\n   36:   def assert_facing(direction)\n   37      raise \"Robot is not facing: \" + direction.to_s if @direction != direction\n   38    end\n   39    \n   40:   # Assert the robot is not facing the given direction\n   41:   def assert_not_facing(direction)\n   42      raise \"Robot is facing: \" + direction.to_s if @direction == direction\n   43    end\n   44    \n   45:   # Assert the robot has precisely the number of beepers given in its beeper bag\n   46:   def assert_beepers(howMany)\n   47      raise \"Robot does not have exactly \" + howMany.to_s + \" beepers.\" if @beepers != howMany    \n   48    end\n   49  \n   50:   # Assert the robot does not have precisely the number of beepers given in its beeper bag\n   51:   def assert_not_beepers(howMany)\n   52      raise \"Robot does have exactly \" + howMany.to_s + \" beepers.\" if @beepers == howMany    \n   53    end\n   54    \n   55:   # Assert the robot has some beepers (i.e. not 0)\n   56:   def assert_some_beepers()\n   57      raise \"Robot has no beepers \" if @beepers == 0    \n   58    end\n   59    \n   60:   # Assert the robot is running\n   61:   def assert_running()\n   62      raise \"Robot is not running\" if not running?()\n   63    end\n   64  \n   65:   # Assert the robot is not running\n   66:   def assert_not_running()\n   67      raise \"Robot is running\" if running?()\n   68    end  \n   69    \n   70:   # Assert the robot's front is clear\n   71:   def assert_front_clear()\n   72        begin\n   73            street = @direction.next_street(@street, @avenue)\n   ..\n   77        end\n   78    end\n   79:   # Assert the robot's front is blocked\n   80:   def assert_front_blocked()\n   81        begin\n   82            street = @direction.next_street(@street, @avenue)\n   ..\n   88    end\n   89    \n   90:   # Assert a robot has at least one neighbor\n   91:   def assert_neighbors()\n   92      raise \"Robot has no neighbor\" if neighbors.empty?()\n   93    end\n   94:   # Assert a robot has no neighbors\n   95:   def assert_no_neighbors()\n   96      raise \"Robot has no neighbor\" if not neighbors.empty?()\n   97    end\n\n465 matches across 69 files\n",
+			"settings":
+			{
+				"buffer_size": 97342,
+				"line_ending": "Unix",
+				"name": "Find Results",
+				"scratch": true
+			}
+		},
+		{
+			"file": "mixins/assertions.rb",
+			"settings":
+			{
+				"buffer_size": 3001,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "tasks/stair_sweeper.rb",
+			"settings":
+			{
+				"buffer_size": 794,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "/home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/Ruby Debugger.sublime-settings",
+			"settings":
+			{
+				"buffer_size": 753,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Threads",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "Connecting... \n/home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/sublime_debug_require.rb:14:in `block in <top (required)>': undefined method `wait_connection=' for Byebug:Module (NoMethodError)\n\tfrom /home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/sublime_debug_require.rb:26:in `<top (required)>'\n\tfrom /home/osboxes/.rvm/rubies/ruby-2.4.2/lib/ruby/site_ruby/2.4.0/rubygems/core_ext/kernel_require.rb:54:in `require'\n\tfrom /home/osboxes/.rvm/rubies/ruby-2.4.2/lib/ruby/site_ruby/2.4.0/rubygems/core_ext/kernel_require.rb:54:in `require'\nDebugger stopped\n\t\t\t",
+			"settings":
+			{
+				"buffer_size": 581,
+				"line_ending": "Unix",
+				"name": "Output",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Immediate",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Watch",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Locals",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Breakpoints",
+				"read_only": true,
+				"scratch": true
+			}
+		},
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix",
+				"name": "Stack",
+				"read_only": true,
+				"scratch": true
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"ins",
+				"Package Control: Install Package"
+			],
+			[
+				"in",
+				"Package Control: Install Package"
+			],
+			[
+				"inst",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/karel.sublime-project",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/main.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/remote_control.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/karel_window.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/environmentsetup.txt",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/adder.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/beeper_finder.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/beeper_layer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/beeper_putter.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/block_walker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/choreographer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/contractor.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/field_harvester.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/guard.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/harvester.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/main.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/mathematician.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/mile_mover.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/mile_walker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/neighbor_talker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/observable_picker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/organizer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/pg13.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/pg14.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/pg23.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/philosopher.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/racer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/relay_racer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/rent_a_jobber.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/replanter.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/section3.9.3.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/sloppy_but_valid.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/sparse_harvester.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/spy.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/strategy_layer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/thread_racer.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/default/walk_listener.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/doc/classes/Checker.html",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/direction.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/tk_robot_world.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/ur_robot.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/world_maker.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot_world_base.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robota.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/sensor_pack.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/stair_sweeper.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/test_robots.rb",
+		"/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel/robot_world.rb"
+	],
+	"find":
+	{
+		"height": 24.0
+	},
+	"find_in_files":
+	{
+		"height": 98.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"assert",
+			"require "
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"require_relative "
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 9,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "default/stair_sweeper.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 797,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								1,
+								1
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 21,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "karel/karel_window.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 17201,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								593,
+								593
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 8,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "karel/robot.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 315,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								178,
+								178
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "karel/tk_robot_world.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 13585,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								706,
+								706
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 12,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "karel/ur_robot.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 4726,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								200,
+								200
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 11,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
+					"file": "mixins/sensor_pack.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1644,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 7,
+					"type": "text"
+				},
+				{
+					"buffer": 6,
+					"file": "karel/robota.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 3626,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								178,
+								178
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 1559.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 5,
+					"type": "text"
+				},
+				{
+					"buffer": 7,
+					"file": "karel/test_robots.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 4098,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1062,
+								1062
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 6,
+					"type": "text"
+				},
+				{
+					"buffer": 8,
+					"file": "karel/world_maker.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 7971,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								683,
+								683
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 10,
+					"type": "text"
+				},
+				{
+					"buffer": 9,
+					"file": "tasks/main.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 635,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								635,
+								635
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 10,
+					"file": "karel/remote_control.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 3665,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								920,
+								920
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 11,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 97342,
+						"regions":
+						{
+							"match":
+							{
+								"flags": 112,
+								"regions":
+								[
+									[
+										258,
+										264
+									],
+									[
+										275,
+										281
+									],
+									[
+										721,
+										727
+									],
+									[
+										747,
+										753
+									],
+									[
+										1234,
+										1240
+									],
+									[
+										1259,
+										1265
+									],
+									[
+										1270,
+										1276
+									],
+									[
+										1320,
+										1326
+									],
+									[
+										1345,
+										1351
+									],
+									[
+										1360,
+										1366
+									],
+									[
+										1410,
+										1416
+									],
+									[
+										1435,
+										1441
+									],
+									[
+										1451,
+										1457
+									],
+									[
+										1530,
+										1536
+									],
+									[
+										1603,
+										1609
+									],
+									[
+										1628,
+										1634
+									],
+									[
+										1643,
+										1649
+									],
+									[
+										1693,
+										1699
+									],
+									[
+										1718,
+										1724
+									],
+									[
+										1740,
+										1746
+									],
+									[
+										1790,
+										1796
+									],
+									[
+										1815,
+										1821
+									],
+									[
+										1835,
+										1841
+									],
+									[
+										1885,
+										1891
+									],
+									[
+										1910,
+										1916
+									],
+									[
+										1928,
+										1934
+									],
+									[
+										1978,
+										1984
+									],
+									[
+										2003,
+										2009
+									],
+									[
+										2024,
+										2030
+									],
+									[
+										2074,
+										2080
+									],
+									[
+										2099,
+										2105
+									],
+									[
+										2114,
+										2120
+									],
+									[
+										2164,
+										2170
+									],
+									[
+										2189,
+										2195
+									],
+									[
+										2208,
+										2214
+									],
+									[
+										2258,
+										2264
+									],
+									[
+										2283,
+										2289
+									],
+									[
+										2303,
+										2309
+									],
+									[
+										2353,
+										2359
+									],
+									[
+										2378,
+										2384
+									],
+									[
+										2397,
+										2403
+									],
+									[
+										2447,
+										2453
+									],
+									[
+										2472,
+										2478
+									],
+									[
+										2492,
+										2498
+									],
+									[
+										2542,
+										2548
+									],
+									[
+										2567,
+										2573
+									],
+									[
+										2586,
+										2592
+									],
+									[
+										2665,
+										2671
+									],
+									[
+										2737,
+										2743
+									],
+									[
+										2762,
+										2768
+									],
+									[
+										2778,
+										2784
+									],
+									[
+										2828,
+										2834
+									],
+									[
+										2853,
+										2859
+									],
+									[
+										2874,
+										2880
+									],
+									[
+										2924,
+										2930
+									],
+									[
+										2949,
+										2955
+									],
+									[
+										2964,
+										2970
+									],
+									[
+										3341,
+										3347
+									],
+									[
+										3671,
+										3677
+									],
+									[
+										3872,
+										3878
+									],
+									[
+										3922,
+										3928
+									],
+									[
+										4069,
+										4075
+									],
+									[
+										4127,
+										4133
+									],
+									[
+										4189,
+										4195
+									],
+									[
+										4252,
+										4258
+									],
+									[
+										4314,
+										4320
+									],
+									[
+										4383,
+										4389
+									],
+									[
+										4450,
+										4456
+									],
+									[
+										4515,
+										4521
+									],
+									[
+										4583,
+										4589
+									],
+									[
+										4645,
+										4651
+									],
+									[
+										4711,
+										4717
+									],
+									[
+										4778,
+										4784
+									],
+									[
+										4844,
+										4850
+									],
+									[
+										4911,
+										4917
+									],
+									[
+										4977,
+										4983
+									],
+									[
+										5040,
+										5046
+									],
+									[
+										5108,
+										5114
+									],
+									[
+										5260,
+										5266
+									],
+									[
+										5367,
+										5373
+									],
+									[
+										5456,
+										5462
+									],
+									[
+										5648,
+										5654
+									],
+									[
+										5808,
+										5814
+									],
+									[
+										5915,
+										5921
+									],
+									[
+										6004,
+										6010
+									],
+									[
+										6192,
+										6198
+									],
+									[
+										6352,
+										6358
+									],
+									[
+										6459,
+										6465
+									],
+									[
+										6548,
+										6554
+									],
+									[
+										6738,
+										6744
+									],
+									[
+										6918,
+										6924
+									],
+									[
+										7025,
+										7031
+									],
+									[
+										7114,
+										7120
+									],
+									[
+										7305,
+										7311
+									],
+									[
+										7470,
+										7476
+									],
+									[
+										7577,
+										7583
+									],
+									[
+										7666,
+										7672
+									],
+									[
+										7855,
+										7861
+									],
+									[
+										8015,
+										8021
+									],
+									[
+										8122,
+										8128
+									],
+									[
+										8211,
+										8217
+									],
+									[
+										8398,
+										8404
+									],
+									[
+										8556,
+										8562
+									],
+									[
+										8663,
+										8669
+									],
+									[
+										8752,
+										8758
+									],
+									[
+										8937,
+										8943
+									],
+									[
+										9096,
+										9102
+									],
+									[
+										9203,
+										9209
+									],
+									[
+										9292,
+										9298
+									],
+									[
+										9480,
+										9486
+									],
+									[
+										9630,
+										9636
+									],
+									[
+										9737,
+										9743
+									],
+									[
+										9826,
+										9832
+									],
+									[
+										10022,
+										10028
+									],
+									[
+										10186,
+										10192
+									],
+									[
+										10293,
+										10299
+									],
+									[
+										10382,
+										10388
+									],
+									[
+										10574,
+										10580
+									],
+									[
+										10738,
+										10744
+									],
+									[
+										10845,
+										10851
+									],
+									[
+										10934,
+										10940
+									],
+									[
+										11128,
+										11134
+									],
+									[
+										11318,
+										11324
+									],
+									[
+										11425,
+										11431
+									],
+									[
+										11514,
+										11520
+									],
+									[
+										11709,
+										11715
+									],
+									[
+										11878,
+										11884
+									],
+									[
+										11985,
+										11991
+									],
+									[
+										12074,
+										12080
+									],
+									[
+										12261,
+										12267
+									],
+									[
+										12411,
+										12417
+									],
+									[
+										12518,
+										12524
+									],
+									[
+										12607,
+										12613
+									],
+									[
+										12799,
+										12805
+									],
+									[
+										12963,
+										12969
+									],
+									[
+										13070,
+										13076
+									],
+									[
+										13159,
+										13165
+									],
+									[
+										13342,
+										13348
+									],
+									[
+										13488,
+										13494
+									],
+									[
+										13595,
+										13601
+									],
+									[
+										13684,
+										13690
+									],
+									[
+										13872,
+										13878
+									],
+									[
+										14037,
+										14043
+									],
+									[
+										14144,
+										14150
+									],
+									[
+										14233,
+										14239
+									],
+									[
+										14421,
+										14427
+									],
+									[
+										14792,
+										14798
+									],
+									[
+										14849,
+										14855
+									],
+									[
+										15087,
+										15093
+									],
+									[
+										15104,
+										15110
+									],
+									[
+										15323,
+										15329
+									],
+									[
+										15389,
+										15395
+									],
+									[
+										15772,
+										15778
+									],
+									[
+										16126,
+										16132
+									],
+									[
+										16325,
+										16331
+									],
+									[
+										16538,
+										16544
+									],
+									[
+										16553,
+										16559
+									],
+									[
+										16864,
+										16870
+									],
+									[
+										16973,
+										16979
+									],
+									[
+										17640,
+										17646
+									],
+									[
+										17659,
+										17665
+									],
+									[
+										17970,
+										17976
+									],
+									[
+										18080,
+										18086
+									],
+									[
+										18747,
+										18753
+									],
+									[
+										18762,
+										18768
+									],
+									[
+										19073,
+										19079
+									],
+									[
+										19183,
+										19189
+									],
+									[
+										19850,
+										19856
+									],
+									[
+										19869,
+										19875
+									],
+									[
+										20180,
+										20186
+									],
+									[
+										20290,
+										20296
+									],
+									[
+										20957,
+										20963
+									],
+									[
+										20968,
+										20974
+									],
+									[
+										21279,
+										21285
+									],
+									[
+										21389,
+										21395
+									],
+									[
+										21537,
+										21543
+									],
+									[
+										21644,
+										21650
+									],
+									[
+										21915,
+										21921
+									],
+									[
+										21930,
+										21936
+									],
+									[
+										22241,
+										22247
+									],
+									[
+										22351,
+										22357
+									],
+									[
+										23523,
+										23529
+									],
+									[
+										23538,
+										23544
+									],
+									[
+										23849,
+										23855
+									],
+									[
+										23959,
+										23965
+									],
+									[
+										24635,
+										24641
+									],
+									[
+										24654,
+										24660
+									],
+									[
+										24965,
+										24971
+									],
+									[
+										25075,
+										25081
+									],
+									[
+										25751,
+										25757
+									],
+									[
+										25767,
+										25773
+									],
+									[
+										26078,
+										26084
+									],
+									[
+										26188,
+										26194
+									],
+									[
+										26963,
+										26969
+									],
+									[
+										26983,
+										26989
+									],
+									[
+										27294,
+										27300
+									],
+									[
+										27404,
+										27410
+									],
+									[
+										28179,
+										28185
+									],
+									[
+										28200,
+										28206
+									],
+									[
+										28511,
+										28517
+									],
+									[
+										28621,
+										28627
+									],
+									[
+										29120,
+										29126
+									],
+									[
+										29136,
+										29142
+									],
+									[
+										29447,
+										29453
+									],
+									[
+										29557,
+										29563
+									],
+									[
+										30023,
+										30029
+									],
+									[
+										30043,
+										30049
+									],
+									[
+										30354,
+										30360
+									],
+									[
+										30464,
+										30470
+									],
+									[
+										30889,
+										30895
+									],
+									[
+										30909,
+										30915
+									],
+									[
+										31220,
+										31226
+									],
+									[
+										31330,
+										31336
+									],
+									[
+										31782,
+										31788
+									],
+									[
+										31804,
+										31810
+									],
+									[
+										32115,
+										32121
+									],
+									[
+										32225,
+										32231
+									],
+									[
+										32679,
+										32685
+									],
+									[
+										32697,
+										32703
+									],
+									[
+										33008,
+										33014
+									],
+									[
+										33118,
+										33124
+									],
+									[
+										33591,
+										33597
+									],
+									[
+										33612,
+										33618
+									],
+									[
+										33923,
+										33929
+									],
+									[
+										34033,
+										34039
+									],
+									[
+										34550,
+										34556
+									],
+									[
+										34571,
+										34577
+									],
+									[
+										34882,
+										34888
+									],
+									[
+										34992,
+										34998
+									],
+									[
+										35491,
+										35497
+									],
+									[
+										35507,
+										35513
+									],
+									[
+										35818,
+										35824
+									],
+									[
+										35928,
+										35934
+									],
+									[
+										36394,
+										36400
+									],
+									[
+										36414,
+										36420
+									],
+									[
+										36725,
+										36731
+									],
+									[
+										36835,
+										36841
+									],
+									[
+										37260,
+										37266
+									],
+									[
+										37280,
+										37286
+									],
+									[
+										37591,
+										37597
+									],
+									[
+										37701,
+										37707
+									],
+									[
+										38153,
+										38159
+									],
+									[
+										38175,
+										38181
+									],
+									[
+										38486,
+										38492
+									],
+									[
+										38596,
+										38602
+									],
+									[
+										39050,
+										39056
+									],
+									[
+										39068,
+										39074
+									],
+									[
+										39379,
+										39385
+									],
+									[
+										39489,
+										39495
+									],
+									[
+										39962,
+										39968
+									],
+									[
+										39983,
+										39989
+									],
+									[
+										40294,
+										40300
+									],
+									[
+										40404,
+										40410
+									],
+									[
+										40925,
+										40931
+									],
+									[
+										41366,
+										41372
+									],
+									[
+										42054,
+										42060
+									],
+									[
+										42496,
+										42502
+									],
+									[
+										43522,
+										43528
+									],
+									[
+										44203,
+										44209
+									],
+									[
+										44644,
+										44650
+									],
+									[
+										45332,
+										45338
+									],
+									[
+										45774,
+										45780
+									],
+									[
+										46800,
+										46806
+									],
+									[
+										47481,
+										47487
+									],
+									[
+										47922,
+										47928
+									],
+									[
+										48610,
+										48616
+									],
+									[
+										49052,
+										49058
+									],
+									[
+										50078,
+										50084
+									],
+									[
+										50983,
+										50989
+									],
+									[
+										51298,
+										51304
+									],
+									[
+										51614,
+										51620
+									],
+									[
+										51929,
+										51935
+									],
+									[
+										52149,
+										52155
+									],
+									[
+										52257,
+										52263
+									],
+									[
+										52360,
+										52366
+									],
+									[
+										52564,
+										52570
+									],
+									[
+										53027,
+										53033
+									],
+									[
+										53162,
+										53168
+									],
+									[
+										53484,
+										53490
+									],
+									[
+										53619,
+										53625
+									],
+									[
+										54266,
+										54272
+									],
+									[
+										54402,
+										54408
+									],
+									[
+										54607,
+										54613
+									],
+									[
+										54715,
+										54721
+									],
+									[
+										55353,
+										55359
+									],
+									[
+										55936,
+										55942
+									],
+									[
+										56548,
+										56554
+									],
+									[
+										57328,
+										57334
+									],
+									[
+										57763,
+										57769
+									],
+									[
+										58508,
+										58514
+									],
+									[
+										58701,
+										58707
+									],
+									[
+										59519,
+										59525
+									],
+									[
+										59679,
+										59685
+									],
+									[
+										59824,
+										59830
+									],
+									[
+										60023,
+										60029
+									],
+									[
+										60217,
+										60223
+									],
+									[
+										60460,
+										60466
+									],
+									[
+										61605,
+										61611
+									],
+									[
+										61848,
+										61854
+									],
+									[
+										62068,
+										62074
+									],
+									[
+										62203,
+										62209
+									],
+									[
+										62337,
+										62343
+									],
+									[
+										62679,
+										62685
+									],
+									[
+										62814,
+										62820
+									],
+									[
+										63002,
+										63008
+									],
+									[
+										63522,
+										63528
+									],
+									[
+										63837,
+										63843
+									],
+									[
+										64153,
+										64159
+									],
+									[
+										64468,
+										64474
+									],
+									[
+										64688,
+										64694
+									],
+									[
+										64796,
+										64802
+									],
+									[
+										64899,
+										64905
+									],
+									[
+										65103,
+										65109
+									],
+									[
+										65566,
+										65572
+									],
+									[
+										65701,
+										65707
+									],
+									[
+										66023,
+										66029
+									],
+									[
+										66158,
+										66164
+									],
+									[
+										66805,
+										66811
+									],
+									[
+										66941,
+										66947
+									],
+									[
+										67146,
+										67152
+									],
+									[
+										67254,
+										67260
+									],
+									[
+										67892,
+										67898
+									],
+									[
+										68475,
+										68481
+									],
+									[
+										69087,
+										69093
+									],
+									[
+										69867,
+										69873
+									],
+									[
+										70302,
+										70308
+									],
+									[
+										71047,
+										71053
+									],
+									[
+										71240,
+										71246
+									],
+									[
+										72058,
+										72064
+									],
+									[
+										72218,
+										72224
+									],
+									[
+										72363,
+										72369
+									],
+									[
+										72562,
+										72568
+									],
+									[
+										72756,
+										72762
+									],
+									[
+										72999,
+										73005
+									],
+									[
+										74144,
+										74150
+									],
+									[
+										74387,
+										74393
+									],
+									[
+										74607,
+										74613
+									],
+									[
+										74742,
+										74748
+									],
+									[
+										74876,
+										74882
+									],
+									[
+										75218,
+										75224
+									],
+									[
+										75353,
+										75359
+									],
+									[
+										75541,
+										75547
+									],
+									[
+										76061,
+										76067
+									],
+									[
+										76376,
+										76382
+									],
+									[
+										76692,
+										76698
+									],
+									[
+										77007,
+										77013
+									],
+									[
+										77227,
+										77233
+									],
+									[
+										77335,
+										77341
+									],
+									[
+										77438,
+										77444
+									],
+									[
+										77642,
+										77648
+									],
+									[
+										78105,
+										78111
+									],
+									[
+										78240,
+										78246
+									],
+									[
+										78562,
+										78568
+									],
+									[
+										78697,
+										78703
+									],
+									[
+										79344,
+										79350
+									],
+									[
+										79480,
+										79486
+									],
+									[
+										79685,
+										79691
+									],
+									[
+										79793,
+										79799
+									],
+									[
+										80431,
+										80437
+									],
+									[
+										81014,
+										81020
+									],
+									[
+										81626,
+										81632
+									],
+									[
+										82406,
+										82412
+									],
+									[
+										82841,
+										82847
+									],
+									[
+										83586,
+										83592
+									],
+									[
+										83779,
+										83785
+									],
+									[
+										84597,
+										84603
+									],
+									[
+										84757,
+										84763
+									],
+									[
+										84902,
+										84908
+									],
+									[
+										85101,
+										85107
+									],
+									[
+										85295,
+										85301
+									],
+									[
+										85538,
+										85544
+									],
+									[
+										86683,
+										86689
+									],
+									[
+										86926,
+										86932
+									],
+									[
+										87146,
+										87152
+									],
+									[
+										87281,
+										87287
+									],
+									[
+										87415,
+										87421
+									],
+									[
+										87757,
+										87763
+									],
+									[
+										87892,
+										87898
+									],
+									[
+										88080,
+										88086
+									],
+									[
+										88434,
+										88440
+									],
+									[
+										88677,
+										88683
+									],
+									[
+										88844,
+										88850
+									],
+									[
+										89060,
+										89066
+									],
+									[
+										89269,
+										89275
+									],
+									[
+										89528,
+										89534
+									],
+									[
+										89740,
+										89746
+									],
+									[
+										89969,
+										89975
+									],
+									[
+										90222,
+										90228
+									],
+									[
+										90497,
+										90503
+									],
+									[
+										90547,
+										90553
+									],
+									[
+										90740,
+										90746
+									],
+									[
+										90912,
+										90918
+									],
+									[
+										90986,
+										90992
+									],
+									[
+										91061,
+										91067
+									],
+									[
+										91135,
+										91141
+									],
+									[
+										91182,
+										91188
+									],
+									[
+										91222,
+										91228
+									],
+									[
+										91257,
+										91263
+									],
+									[
+										91325,
+										91331
+									],
+									[
+										91440,
+										91446
+									],
+									[
+										91475,
+										91481
+									],
+									[
+										91561,
+										91567
+									],
+									[
+										91596,
+										91602
+									],
+									[
+										91753,
+										91759
+									],
+									[
+										91789,
+										91795
+									],
+									[
+										91858,
+										91864
+									],
+									[
+										91896,
+										91902
+									],
+									[
+										92043,
+										92049
+									],
+									[
+										92171,
+										92177
+									],
+									[
+										92308,
+										92314
+									],
+									[
+										92499,
+										92505
+									],
+									[
+										92648,
+										92654
+									],
+									[
+										92835,
+										92841
+									],
+									[
+										92888,
+										92894
+									],
+									[
+										93050,
+										93056
+									],
+									[
+										93105,
+										93111
+									],
+									[
+										93145,
+										93151
+									],
+									[
+										93202,
+										93208
+									],
+									[
+										93254,
+										93260
+									],
+									[
+										93324,
+										93330
+									],
+									[
+										93531,
+										93537
+									],
+									[
+										93580,
+										93586
+									],
+									[
+										93626,
+										93632
+									],
+									[
+										93660,
+										93666
+									],
+									[
+										93691,
+										93697
+									],
+									[
+										93769,
+										93775
+									],
+									[
+										93803,
+										93809
+									],
+									[
+										93855,
+										93861
+									],
+									[
+										93987,
+										93993
+									],
+									[
+										94017,
+										94023
+									],
+									[
+										94072,
+										94078
+									],
+									[
+										94207,
+										94213
+									],
+									[
+										94266,
+										94272
+									],
+									[
+										94401,
+										94407
+									],
+									[
+										94456,
+										94462
+									],
+									[
+										94591,
+										94597
+									],
+									[
+										94650,
+										94656
+									],
+									[
+										94785,
+										94791
+									],
+									[
+										94840,
+										94846
+									],
+									[
+										94877,
+										94883
+									],
+									[
+										94910,
+										94916
+									],
+									[
+										94966,
+										94972
+									],
+									[
+										95025,
+										95031
+									],
+									[
+										95205,
+										95211
+									],
+									[
+										95265,
+										95271
+									],
+									[
+										95409,
+										95415
+									],
+									[
+										95473,
+										95479
+									],
+									[
+										95617,
+										95623
+									],
+									[
+										95707,
+										95713
+									],
+									[
+										95867,
+										95873
+									],
+									[
+										95967,
+										95973
+									],
+									[
+										96129,
+										96135
+									],
+									[
+										96189,
+										96195
+									],
+									[
+										96307,
+										96313
+									],
+									[
+										96348,
+										96354
+									],
+									[
+										96455,
+										96461
+									],
+									[
+										96500,
+										96506
+									],
+									[
+										96607,
+										96613
+									],
+									[
+										96654,
+										96660
+									],
+									[
+										96808,
+										96814
+									],
+									[
+										96857,
+										96863
+									],
+									[
+										97006,
+										97012
+									],
+									[
+										97060,
+										97066
+									],
+									[
+										97166,
+										97172
+									],
+									[
+										97211,
+										97217
+									]
+								],
+								"scope": ""
+							}
+						},
+						"selection":
+						[
+							[
+								4094,
+								4094
+							]
+						],
+						"settings":
+						{
+							"default_dir": "/home/osboxes/Documents/KarelRuby/KarelRTuesday/karel",
+							"detect_indentation": false,
+							"line_numbers": false,
+							"output_tag": 1,
+							"result_base_dir": "",
+							"result_file_regex": "^([^ \t].*):$",
+							"result_line_regex": "^ +([0-9]+):",
+							"scroll_past_end": true,
+							"syntax": "Packages/Default/Find Results.hidden-tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 360.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 12,
+					"file": "mixins/assertions.rb",
+					"semi_transient": true,
+					"settings":
+					{
+						"buffer_size": 3001,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 717.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 13,
+					"file": "tasks/stair_sweeper.rb",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 794,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								188,
+								188
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Ruby/Ruby.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 9,
+					"type": "text"
+				},
+				{
+					"buffer": 14,
+					"file": "/home/osboxes/.config/sublime-text-3/Packages/Ruby Debugger/Ruby Debugger.sublime-settings",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 753,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								553,
+								553
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/JavaScript/JSON.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 15,
+					"type": "text"
+				},
+				{
+					"buffer": 15,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 17,
+					"type": "text"
+				},
+				{
+					"buffer": 16,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 581,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								581,
+								581
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 13,
+					"type": "text"
+				},
+				{
+					"buffer": 17,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 20,
+					"type": "text"
+				},
+				{
+					"buffer": 18,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 16,
+					"type": "text"
+				},
+				{
+					"buffer": 19,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 19,
+					"type": "text"
+				},
+				{
+					"buffer": 20,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 18,
+					"type": "text"
+				},
+				{
+					"buffer": 21,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+							"breakpoint":
+							{
+								"flags": 16,
+								"icon": "Packages/Theme - Default/common/circle.png",
+								"regions":
+								[
+								],
+								"scope": "string"
+							}
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"word_wrap": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 14,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 24.0
+	},
+	"input":
+	{
+		"height": 36.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.Debugger":
+	{
+		"height": 108.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "karel.sublime-project",
+	"replace":
+	{
+		"height": 44.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": true,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 233.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

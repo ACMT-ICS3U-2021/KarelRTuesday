@@ -1,0 +1,25 @@
+To set up the environment to run programs from default
+
+The environment variables must be at least
+-I ".:../karel"
+
+To run from karel use
+-I "."
+
+$graphical can be true or false to define which type of world will be used (default is true)
+  Set it true or false before you require_relative anything such as ur_robot. 
+
+$tracing can be true or false. In a non-graphical world, when it is true, each robot action will be printed on console
+
+If $graphical is false, you can just put any task into the main task block
+
+If $graphical is true, you need to create a window. One way is (assuming method task is defined):
+
+if __FILE__ == $0
+  window(8, 40).run do #parameters are size and speed
+    task()
+  end
+end
+
+Note that you should create the window before you reference the world. 
+If you need to reference the world before the task block see pg14.rb to see how

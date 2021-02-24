@@ -1,0 +1,5 @@
+KarelWorld
+beepers 2 2 1
+beepers 4 4 1
+beepers 2 4 1
+beepers 4 2 1
