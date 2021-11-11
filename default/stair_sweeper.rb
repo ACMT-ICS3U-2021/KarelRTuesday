@@ -1,6 +1,6 @@
 
- $graphical = false
-require_relative "ur_robot"
+ $graphical = true
+require_relative "../karel/ur_robot"
 
 class StairSweeper < UrRobot    
     #Robot turns right by executing three turn_left instructions

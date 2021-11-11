@@ -4,7 +4,6 @@
 
 require_relative "run_params"
 require_relative "stair_sweeper"
-require_relative "robota"
 
 # a task for a stair sweeper
 def task()
@@ -19,7 +18,6 @@ def task()
   karel.climb_stair()
   karel.pick_beeper()
   karel.turn_off()
-  karel.display()
   world.show_world_with_robots(1, 1, 6, 6)
   karel.display()
   
