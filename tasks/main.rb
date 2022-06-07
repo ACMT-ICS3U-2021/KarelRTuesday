@@ -4,24 +4,33 @@
 
 $graphical = true
 
-require_relative "stair_sweeper"
+require_relative "h_writer"
+require_relative "e_writer"
+require_relative "l_writer"
+require_relative "o_writer"
 require_relative "../karel/robota"
 
 # a task for a stair sweeper
 def task()
   world = Robota::World
-  world.read_world("../worlds/stair_world.txt")
   
-  karel = StairSweeper.new(1, 1, Robota::EAST, 0)
-  karel.sweep_stairs()
-  world.show_world_with_robots(1, 1, 6, 6)
-  karel.display()
+  h = HWriter.new(3, 2, Robota::NORTH, 12)
+  e = EWriter.new(3, 7, Robota::NORTH, 11)
+  l1 = LWriter.new(3, 11, Robota::NORTH, 11)
+  l2 = LWriter.new(3, 15, Robota::NORTH, 11)
+  o = OWriter.new(3, 19, Robota::NORTH, 12)
   
+  h.write_letter
+  e.write_letter
+  l1.write_letter
+  l2.write_letter
+  o.write_letter
+
 end
 
 if __FILE__ == $0
   if $graphical
-     screen = window(8, 40) # (size, speed)
+     screen = window(30, 80) # (size, speed)
      screen.run do
        task
      end
